@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Kategori {
+  id        Int      @id @default(autoincrement())
+  nama      String
+  jenis     String   // "pemasukan" atau "pengeluaran"
+  icon      String?
+  warna     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  transaksi Transaksi[]
+  
+  @@unique([nama, jenis])
+  @@map("kategori")
+}
+
+model Transaksi {
+  id          Int       @id @default(autoincrement())
+  judul       String
+  jumlah      Float
+  deskripsi   String?
+  tanggal     DateTime
+  tipe        String    // "pemasukan" atau "pengeluaran"
+  kategoriId  Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  kategori    Kategori? @relation(fields: [kategoriId], references: [id])
+  
+  @@map("transaksi")
+}
+
+model Tabungan {
+  id          Int       @id @default(autoincrement())
+  nama        String
+  target      Float
+  targetDate  DateTime?
+  jumlah      Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("tabungan")
+}
+
+model Anggaran {
+  id          Int       @id @default(autoincrement())
+  kategori   String
+  jumlah     Float
+  periode    String    // "bulanan", "tahunan"
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  @@map("anggaran")
+}
