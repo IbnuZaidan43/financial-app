@@ -6,15 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Search, 
-  Filter, 
-  Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
-  Trash2,
-  Wallet
-} from 'lucide-react';
+import { Search, Filter, Calendar,ArrowUpRight,ArrowDownRight,Trash2,Wallet } from 'lucide-react';
 import { KeuanganService, Tabungan, Transaksi } from '@/lib/keuangan-db';
 
 interface RiwayatTransaksiTabProps {
@@ -28,8 +20,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
   const [filterTabungan, setFilterTabungan] = useState<string>('semua');
   const [filterJenis, setFilterJenis] = useState<string>('semua');
   const [filterBulan, setFilterBulan] = useState<string>('semua');
-
-  // Generate bulan options
   const bulanOptions = [
     { value: '1', label: 'Januari' },
     { value: '2', label: 'Februari' },
@@ -45,25 +35,20 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     { value: '12', label: 'Desember' }
   ];
 
-  // Filter transaksi
   const filteredTransaksi = useMemo(() => {
     return transaksi.filter(t => {
-      // Search filter
       if (searchTerm && !t.keterangan.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false;
       }
 
-      // Tabungan filter
       if (filterTabungan !== 'semua' && t.tabunganId.toString() !== filterTabungan) {
         return false;
       }
 
-      // Jenis filter
       if (filterJenis !== 'semua' && t.jenis !== filterJenis) {
         return false;
       }
 
-      // Bulan filter
       if (filterBulan !== 'semua') {
         const bulanTransaksi = new Date(t.tanggal).getMonth() + 1;
         if (bulanTransaksi.toString() !== filterBulan) {
@@ -99,7 +84,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
 
   return (
     <div className="space-y-6">
-      {/* Filter Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -109,7 +93,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Search Bar */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -120,9 +103,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
               />
             </div>
 
-            {/* Horizontal Filters */}
             <div className="flex flex-col sm:flex-row gap-3">
-              {/* Filter Tabungan */}
               <Select value={filterTabungan} onValueChange={setFilterTabungan}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Semua Tabungan" />
@@ -137,7 +118,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                 </SelectContent>
               </Select>
 
-              {/* Filter Jenis */}
               <Select value={filterJenis} onValueChange={setFilterJenis}>
                 <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="Semua Jenis" />
@@ -149,7 +129,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                 </SelectContent>
               </Select>
 
-              {/* Filter Bulan */}
               <Select value={filterBulan} onValueChange={setFilterBulan}>
                 <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="Semua Bulan" />
@@ -168,7 +147,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
         </CardContent>
       </Card>
 
-      {/* Transaksi List */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">

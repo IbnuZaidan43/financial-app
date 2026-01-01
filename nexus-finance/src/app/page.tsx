@@ -6,16 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Wallet, 
-  History, 
-  PiggyBank, 
-  FileText, 
-  Plus,
-  TrendingUp,
-  TrendingDown,
-  DollarSign
-} from 'lucide-react';
+import { Wallet, History, PiggyBank, FileText, Plus,TrendingUp,TrendingDown,DollarSign } from 'lucide-react';
 import { KeuanganService, Tabungan, Transaksi } from '@/lib/keuangan-db';
 import DashboardTab from '@/components/tabs/DashboardTab';
 import RiwayatTransaksiTab from '@/components/tabs/RiwayatTransaksiTab';
@@ -30,7 +21,6 @@ export default function KeuanganPage() {
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Load data saat component mount dan saat tab berubah
   useEffect(() => {
     loadData();
   }, [activeTab, refreshKey]);
@@ -57,7 +47,6 @@ export default function KeuanganPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -80,7 +69,6 @@ export default function KeuanganPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 bg-white p-1 rounded-lg shadow-sm">
@@ -132,21 +120,16 @@ export default function KeuanganPage() {
 
           <TabsContent value="tabungan" className="space-y-6">
             <TabunganTab 
-              tabungan={tabungan}
               onDataUpdate={loadData}
             />
           </TabsContent>
 
           <TabsContent value="file" className="space-y-6">
-            <FileTab 
-              tabungan={tabungan}
-              transaksi={transaksi}
-            />
+            <FileTab />
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-50">
         <Button
           onClick={() => setShowTransaksiDialog(true)}
@@ -157,7 +140,6 @@ export default function KeuanganPage() {
         </Button>
       </div>
 
-      {/* Transaksi Dialog */}
       <TransaksiDialog
         open={showTransaksiDialog}
         onOpenChange={setShowTransaksiDialog}

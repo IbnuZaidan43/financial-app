@@ -1,156 +1,91 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Download, 
-  Upload, 
-  FileText, 
-  Database,
-  AlertCircle,
-  CheckCircle,
-  Clock
-} from 'lucide-react';
-import { KeuanganService, Tabungan, Transaksi } from '@/lib/keuangan-db';
+import { Download, Upload, Database,FileSpreadsheet,Settings } from 'lucide-react';
+import { ExportDialog } from '@/components/dialogs/ExportDialog';
+import { ImportDialog } from '@/components/dialogs/ImportDialog';
+import { useTransactions, useSavings } from '@/hooks/use-api';
 
-interface FileTabProps {
-  tabungan: Tabungan[];
-  transaksi: Transaksi[];
-}
+export default function FileTab() {
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
-export default function FileTab({ tabungan, transaksi }: FileTabProps) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState<{
-    type: 'success' | 'error' | 'info' | null;
-    message: string;
-  }>({ type: null, message: '' });
+  const { transactions, refetch: refetchTransactions } = useTransactions();
+  const { savings, refetch: refetchSavings } = useSavings();
 
-  // Export functions (placeholder untuk sekarang)
-  const exportTabunganToExcel = async () => {
-    setIsExporting(true);
-    setImportStatus({ type: 'info', message: 'Fitur export akan segera hadir!' });
-    
-    // Simulasi export
-    setTimeout(() => {
-      setIsExporting(false);
-      setImportStatus({ 
-        type: 'success', 
-        message: 'Template export berhasil dibuat! (Fitur akan segera tersedia)' 
-      });
-    }, 2000);
+  const handleExport = async (type: string) => {
+    try {
+      let endpoint = '';
+      
+      if (type === 'transactions') {
+        endpoint = '/api/export/transactions';
+      } else if (type === 'savings') {
+        endpoint = '/api/export/savings';
+      } else {
+        endpoint = '/api/export/transactions';
+      }
+      
+      const response = await fetch(endpoint);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        const filename = type === 'savings' 
+          ? `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.csv`
+          : `Laporan_Keuangan_${new Date().toISOString().split('T')[0]}.csv`;
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        throw new Error('Export failed');
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      throw error;
+    }
   };
 
-  const exportTransaksiToExcel = async () => {
-    setIsExporting(true);
-    setImportStatus({ type: 'info', message: 'Fitur export akan segera hadir!' });
-    
-    // Simulasi export
-    setTimeout(() => {
-      setIsExporting(false);
-      setImportStatus({ 
-        type: 'success', 
-        message: 'Template export berhasil dibuat! (Fitur akan segera tersedia)' 
-      });
-    }, 2000);
+  const handleImportComplete = () => {
+    Promise.all([
+      refetchTransactions(),
+      refetchSavings()
+    ]);
   };
 
-  const exportAllToExcel = async () => {
-    setIsExporting(true);
-    setImportStatus({ type: 'info', message: 'Sedang mengekspor semua data...' });
+  useEffect(() => {
+    const handleImportCompleteEvent = () => {
+      Promise.all([
+        refetchTransactions(),
+        refetchSavings()
+      ]);
+    };
+
+    window.addEventListener('import-complete', handleImportCompleteEvent);
     
-    // Simulasi export
-    setTimeout(() => {
-      setIsExporting(false);
-      setImportStatus({ 
-        type: 'success', 
-        message: 'Semua data berhasil diekspor! (Fitur akan segera tersedia)' 
-      });
-    }, 3000);
-  };
+    return () => {
+      window.removeEventListener('import-complete', handleImportCompleteEvent);
+    };
+  }, [refetchTransactions, refetchSavings]);
 
-  // Import functions (placeholder untuk sekarang)
-  const importTabunganFromExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    setImportStatus({ type: 'info', message: 'Sedang memproses file...' });
-    
-    // Simulasi import
-    setTimeout(() => {
-      setIsImporting(false);
-      setImportStatus({ 
-        type: 'success', 
-        message: 'File berhasil diimport! (Fitur akan segera tersedia)' 
-      });
-    }, 2000);
-  };
-
-  const importTransaksiFromExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    setImportStatus({ type: 'info', message: 'Sedang memproses file...' });
-    
-    // Simulasi import
-    setTimeout(() => {
-      setIsImporting(false);
-      setImportStatus({ 
-        type: 'success', 
-        message: 'File berhasil diimport! (Fitur akan segera tersedia)' 
-      });
-    }, 2000);
-  };
-
-  const downloadTemplate = (type: 'tabungan' | 'transaksi') => {
-    setImportStatus({ type: 'info', message: 'Template akan segera tersedia!' });
-    
-    // Simulasi download
-    setTimeout(() => {
-      setImportStatus({ 
-        type: 'success', 
-        message: `Template ${type} berhasil diunduh! (Fitur akan segera tersedia)` 
-      });
-    }, 1000);
-  };
-
-  const totalSaldo = tabungan.reduce((total, t) => total + t.saldoSaatIni, 0);
-  const totalPemasukan = transaksi.filter(t => t.jenis === 'pemasukan').reduce((total, t) => total + t.jumlah, 0);
-  const totalPengeluaran = transaksi.filter(t => t.jenis === 'pengeluaran').reduce((total, t) => total + t.jumlah, 0);
+  const totalSaldo = savings.reduce((total, s) => total + s.jumlah, 0);
+  const totalPemasukan = transactions.reduce((total, t) => 
+    t.tipe === 'pemasukan' ? total + t.jumlah : total, 0
+  );
+  const totalPengeluaran = transactions.reduce((total, t) => 
+    t.tipe === 'pengeluaran' ? total + t.jumlah : total, 0
+  );
 
   return (
     <div className="space-y-6">
-      {/* Status Message */}
-      {importStatus.type && (
-        <Card className={`border-l-4 ${
-          importStatus.type === 'success' ? 'border-green-500 bg-green-50' :
-          importStatus.type === 'error' ? 'border-red-500 bg-red-50' :
-          'border-blue-500 bg-blue-50'
-        }`}>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              {importStatus.type === 'success' && <CheckCircle className="h-5 w-5 text-green-600" />}
-              {importStatus.type === 'error' && <AlertCircle className="h-5 w-5 text-red-600" />}
-              {importStatus.type === 'info' && <Clock className="h-5 w-5 text-blue-600" />}
-              <p className={`${
-                importStatus.type === 'success' ? 'text-green-800' :
-                importStatus.type === 'error' ? 'text-red-800' :
-                'text-blue-800'
-              }`}>
-                {importStatus.message}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Data Overview */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -161,11 +96,11 @@ export default function FileTab({ tabungan, transaksi }: FileTabProps) {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{tabungan.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{savings.length}</div>
               <p className="text-sm text-gray-600">Total Tabungan</p>
             </div>
             <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{transaksi.length}</div>
+              <div className="text-2xl font-bold text-green-600">{transactions.length}</div>
               <p className="text-sm text-gray-600">Total Transaksi</p>
             </div>
             <div className="text-center p-4 border rounded-lg">
@@ -177,7 +112,7 @@ export default function FileTab({ tabungan, transaksi }: FileTabProps) {
                   maximumFractionDigits: 0
                 }).format(totalSaldo)}
               </div>
-              <p className="text-sm text-gray-600">Total Saldo</p>
+              <p className="text-sm text-gray-600">Total Saldo Tabungan</p>
             </div>
             <div className="text-center p-4 border rounded-lg">
               <div className="text-lg font-bold text-orange-600">
@@ -188,13 +123,12 @@ export default function FileTab({ tabungan, transaksi }: FileTabProps) {
                   maximumFractionDigits: 0
                 }).format(totalPemasukan - totalPengeluaran)}
               </div>
-              <p className="text-sm text-gray-600">Netto</p>
+              <p className="text-sm text-gray-600">Saldo Transaksi</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Export Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -204,54 +138,48 @@ export default function FileTab({ tabungan, transaksi }: FileTabProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Button
-                onClick={exportTabunganToExcel}
-                disabled={isExporting || tabungan.length === 0}
-                className="h-20 flex-col gap-2"
-                variant="outline"
-              >
-                <FileText className="h-6 w-6" />
-                <span>Export Tabungan</span>
-                <span className="text-xs text-gray-500">{tabungan.length} data</span>
-              </Button>
-              
-              <Button
-                onClick={exportTransaksiToExcel}
-                disabled={isExporting || transaksi.length === 0}
-                className="h-20 flex-col gap-2"
-                variant="outline"
-              >
-                <FileText className="h-6 w-6" />
-                <span>Export Transaksi</span>
-                <span className="text-xs text-gray-500">{transaksi.length} data</span>
-              </Button>
-              
-              <Button
-                onClick={exportAllToExcel}
-                disabled={isExporting || (tabungan.length === 0 && transaksi.length === 0)}
+                onClick={() => setShowExportDialog(true)}
+                disabled={transactions.length === 0}
                 className="h-20 flex-col gap-2 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                <Database className="h-6 w-6" />
-                <span>Export Semua Data</span>
-                <span className="text-xs text-blue-100">Lengkap</span>
+                <FileSpreadsheet className="h-6 w-6" />
+                <span>Export Laporan Keuangan</span>
+                <span className="text-xs text-blue-100">
+                  {transactions.length} transaksi • {savings.length} tabungan
+                </span>
+              </Button>
+              
+              <Button
+                onClick={() => setShowExportDialog(true)}
+                disabled={transactions.length === 0}
+                variant="outline"
+                className="h-20 flex-col gap-2"
+              >
+                <Settings className="h-6 w-6" />
+                <span>Pilih Format Export</span>
+                <span className="text-xs text-gray-500">
+                  Merge tanggal atau format asli
+                </span>
               </Button>
             </div>
             
             <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2">Format Export:</h4>
+              <h4 className="font-medium text-blue-800 mb-2">Fitur Export:</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Tabungan: Nama, Kategori, Saldo Awal, Saldo Saat Ini</li>
-                <li>• Transaksi: Tanggal, Jenis, Jumlah, Keterangan, Sumber</li>
-                <li>• Format: .xlsx (Microsoft Excel)</li>
-                <li>• Lokasi: Download folder browser Anda</li>
+                <li>• Format sesuai template yang kamu upload</li>
+                <li>• Tanggal yang sama di-merge untuk efisiensi</li>
+                <li>• Deskripsi diambil dari input user</li>
+                <li>• Tabungan menyesuaikan data aplikasi</li>
+                <li>• Format: .csv (Excel Compatible)</li>
+                <li>• Otomatis download ke browser</li>
               </ul>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Import Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -261,80 +189,59 @@ export default function FileTab({ tabungan, transaksi }: FileTabProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Import Tabungan */}
-              <div className="space-y-4">
-                <h3 className="font-medium">Import Tabungan</h3>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-sm text-gray-600 mb-4">
-                    Upload file Excel untuk import data tabungan
-                  </p>
-                  <Input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={importTabunganFromExcel}
-                    disabled={isImporting}
-                    className="max-w-xs mx-auto"
-                  />
-                </div>
-                <Button
-                  onClick={() => downloadTemplate('tabungan')}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Template Tabungan
-                </Button>
-              </div>
-
-              {/* Import Transaksi */}
-              <div className="space-y-4">
-                <h3 className="font-medium">Import Transaksi</h3>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-sm text-gray-600 mb-4">
-                    Upload file Excel untuk import data transaksi
-                  </p>
-                  <Input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={importTransaksiFromExcel}
-                    disabled={isImporting}
-                    className="max-w-xs mx-auto"
-                  />
-                </div>
-                <Button
-                  onClick={() => downloadTemplate('transaksi')}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Template Transaksi
-                </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button
+                onClick={() => setShowImportDialog(true)}
+                className="h-20 flex-col gap-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                <FileSpreadsheet className="h-6 w-6" />
+                <span>Import Transaksi</span>
+                <span className="text-xs text-green-100">
+                  Upload file Excel
+                </span>
+              </Button>
+              
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm text-gray-600">
+                  Atau klik tombol Import untuk upload file
+                </p>
               </div>
             </div>
 
             <Separator />
 
-            {/* Import Guidelines */}
             <div className="bg-amber-50 p-4 rounded-lg">
               <h4 className="font-medium text-amber-800 mb-2">Panduan Import:</h4>
               <ul className="text-sm text-amber-700 space-y-1">
-                <li>• Download template terlebih dahulu untuk format yang benar</li>
-                <li>• Pastikan nama tabungan di import sudah ada di database</li>
-                <li>• Format tanggal: DD/MM/YYYY atau YYYY-MM-DD</li>
-                <li>• Jenis transaksi: "pemasukan" atau "pengeluaran"</li>
-                <li>• Kategori tabungan: "rekening_bank", "cash", "e_wallet", "e_money"</li>
-                <li>• Data duplikat akan diabaikan</li>
-                <li>• Backup data terlebih dahulu sebelum import</li>
+                <li>• Gunakan template export sebagai referensi format</li>
+                <li>• Format tanggal: YYYY-MM-DD (contoh: 2024-12-01)</li>
+                <li>• Kolom deskripsi bebas sesuai input user</li>
+                <li>• Setiap baris akan menjadi transaksi individual</li>
+                <li>• Sistem otomatis mapping kategori berdasarkan deskripsi</li>
+                <li>• Data duplikat akan ditambah sebagai transaksi baru</li>
+                <li>• Support export dengan merge tanggal</li>
               </ul>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-800 mb-2">Template:</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Template export yang sudah di-generate bisa langsung digunakan untuk import.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                  Export dulu → Edit → Import kembali
+                </Badge>
+                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                  Format otomatis sesuai aplikasi
+                </Badge>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Status Indicators */}
       <Card>
         <CardHeader>
           <CardTitle>Status Fitur</CardTitle>
@@ -342,26 +249,43 @@ export default function FileTab({ tabungan, transaksi }: FileTabProps) {
         <CardContent>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                Coming Soon
+              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                Ready
               </Badge>
-              <span className="text-sm">Export/Import Excel akan segera tersedia</span>
+              <span className="text-sm">Export transaksi dengan merge tanggal</span>
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
                 Ready
               </Badge>
-              <span className="text-sm">Template dan format sudah disiapkan</span>
+              <span className="text-sm">Import transaksi dari Excel</span>
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                Planning
+                Smart
               </Badge>
-              <span className="text-sm">Auto-sync dan backup cloud akan tersedia</span>
+              <span className="text-sm">Otomatis mapping kategori dan deskripsi</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                Efficient
+              </Badge>
+              <span className="text-sm">Merge tanggal untuk tampilan yang rapi</span>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        onExport={handleExport}
+      />
+
+      <ImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+      />
     </div>
   );
 }
