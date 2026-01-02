@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import type { Tabungan } from '@prisma/client'
 
 export async function GET() {
   try {
@@ -19,14 +20,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nama, target, targetDate } = body
+    const { nama, saldoAwal } = body
     
     const tabungan = await db.tabungan.create({
       data: {
         nama,
-        target: parseFloat(target),
-        targetDate: targetDate ? new Date(targetDate) : null,
-        jumlah: 0
+        saldoAwal: parseFloat(saldoAwal) || 0,
+        jumlah: parseFloat(saldoAwal) || 0
       }
     })
     

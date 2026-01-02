@@ -42,13 +42,12 @@ model Transaksi {
 }
 
 model Tabungan {
-  id          Int       @id @default(autoincrement())
-  nama        String
-  target      Float
-  targetDate  DateTime?
-  jumlah      Float     @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        Int       @id @default(autoincrement())
+  nama      String
+  saldoAwal Float     @default(0)
+  jumlah    Float     @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   
   @@map("tabungan")
 }

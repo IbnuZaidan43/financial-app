@@ -7,18 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Wallet, CreditCard, Smartphone, DollarSign,Edit,Trash2 } from 'lucide-react';
+import { 
+  Plus, 
+  Wallet, 
+  CreditCard, 
+  Smartphone, 
+  DollarSign,
+  Edit,
+  Trash2
+} from 'lucide-react';
 import { useSavings } from '@/hooks/use-api';
+import type { Tabungan as PrismaTabungan } from '@prisma/client';
 
-interface Tabungan {
-  id: number;
-  nama: string;
-  target: number;
-  jumlah: number;
-  targetDate?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+type Tabungan = PrismaTabungan;
 
 interface TabunganTabProps {
   onDataUpdate: () => void;
@@ -31,23 +32,21 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
   const [editingTabungan, setEditingTabungan] = useState<Tabungan | null>(null);
   const [formData, setFormData] = useState({
     nama: '',
-    target: '',
-    targetDate: ''
+    saldoAwal: ''
   });
 
   const resetForm = () => {
     setFormData({
       nama: '',
-      target: '',
-      targetDate: ''
+      saldoAwal: ''
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.nama || !formData.target) {
-      alert('Mohon lengkapi nama dan target tabungan');
+    if (!formData.nama) {
+      alert('Mohon lengkapi nama tabungan');
       return;
     }
 
@@ -59,8 +58,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         },
         body: JSON.stringify({
           nama: formData.nama,
-          target: parseFloat(formData.target.replace(/\./g, '')),
-          targetDate: formData.targetDate ? new Date(formData.targetDate).toISOString() : null
+          saldoAwal: formData.saldoAwal.replace(/\./g, '') || '0'
         }),
       });
 
@@ -85,8 +83,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     setEditingTabungan(tabungan);
     setFormData({
       nama: tabungan.nama,
-      target: tabungan.target.toString(),
-      targetDate: tabungan.targetDate ? new Date(tabungan.targetDate).toISOString().split('T')[0] : ''
+      saldoAwal: tabungan.saldoAwal.toString()
     });
     setShowEditDialog(true);
   };
@@ -124,6 +121,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Header dengan tombol tambah */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Daftar Tabungan</h2>
@@ -152,26 +150,16 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
               </div>
               
               <div>
-                <label className="text-sm font-medium mb-2 block">Target Tabungan</label>
+                <label className="text-sm font-medium mb-2 block">Saldo Awal</label>
                 <Input
                   type="text"
-                  placeholder="Contoh: 10000000"
-                  value={formData.target}
+                  placeholder="Contoh: 1000000"
+                  value={formData.saldoAwal}
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, '');
                     const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-                    setFormData({...formData, target: formatted});
+                    setFormData({...formData, saldoAwal: formatted});
                   }}
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-2 block">Target Date (Opsional)</label>
-                <Input
-                  type="date"
-                  value={formData.targetDate}
-                  onChange={(e) => setFormData({...formData, targetDate: e.target.value})}
                 />
               </div>
               
@@ -195,6 +183,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Dialog>
       </div>
 
+      {/* Total Saldo Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
@@ -217,6 +206,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </CardContent>
       </Card>
 
+      {/* Daftar Tabungan */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tabungan.map((t) => (
           <Card key={t.id} className="hover:shadow-md transition-shadow">
@@ -268,12 +258,12 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                 </div>
                 <div className="pt-2 border-t">
                   <p className="text-xs text-gray-500">
-                    Target: {new Intl.NumberFormat('id-ID', {
+                    Saldo Awal: {new Intl.NumberFormat('id-ID', {
                       style: 'currency',
                       currency: 'IDR',
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0
-                    }).format(t.target)}
+                    }).format(t.saldoAwal)}
                   </p>
                   <p className="text-xs text-gray-500">
                     Dibuat: {new Date(t.createdAt).toLocaleDateString('id-ID')}
@@ -285,6 +275,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         ))}
       </div>
 
+      {/* Empty State */}
       {tabungan.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
@@ -301,6 +292,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Card>
       )}
 
+      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
@@ -318,26 +310,16 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
             </div>
             
             <div>
-              <label className="text-sm font-medium mb-2 block">Target Tabungan</label>
+              <label className="text-sm font-medium mb-2 block">Saldo Awal</label>
               <Input
                 type="text"
-                placeholder="Contoh: 10000000"
-                value={formData.target}
+                placeholder="Contoh: 1000000"
+                value={formData.saldoAwal}
                 onChange={(e) => {
                   const value = e.target.value.replace(/\D/g, '');
                   const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-                  setFormData({...formData, target: formatted});
+                  setFormData({...formData, saldoAwal: formatted});
                 }}
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium mb-2 block">Target Date (Opsional)</label>
-              <Input
-                type="date"
-                value={formData.targetDate}
-                onChange={(e) => setFormData({...formData, targetDate: e.target.value})}
               />
             </div>
             

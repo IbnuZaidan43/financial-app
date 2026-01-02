@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import type { Tabungan, Transaksi } from '@prisma/client'
 
 interface Transaction {
   id: number
@@ -17,15 +18,8 @@ interface Transaction {
   }
 }
 
-interface Savings {
-  id: number
-  nama: string
-  target: number
-  targetDate?: string
-  jumlah: number
-  createdAt: string
-  updatedAt: string
-}
+// Gunakan type dari Prisma agar selalu sync
+type Savings = Tabungan
 
 interface DashboardStats {
   totalPemasukan: number
