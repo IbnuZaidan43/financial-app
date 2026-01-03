@@ -6,19 +6,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Wallet, History, PiggyBank, FileText, Plus,TrendingUp,TrendingDown,DollarSign } from 'lucide-react';
-import { KeuanganService, Tabungan, Transaksi } from '@/lib/keuangan-db';
+import { Wallet, History, PiggyBank, FileText, Plus, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import DashboardTab from '@/components/tabs/DashboardTab';
 import RiwayatTransaksiTab from '@/components/tabs/RiwayatTransaksiTab';
 import TabunganTab from '@/components/tabs/TabunganTab';
 import FileTab from '@/components/tabs/FileTab';
 import TransaksiDialog from '@/components/dialogs/TransaksiDialog';
 
+interface TabunganData {
+  id: number;
+  nama: string;
+  saldoAwal: number;
+  jumlah: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+interface TransaksiData {
+  id: number;
+  judul: string;
+  jumlah: number;
+  deskripsi?: string | null;
+  tanggal: string | Date;
+  tipe: string;
+  kategoriId?: number | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export default function KeuanganPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showTransaksiDialog, setShowTransaksiDialog] = useState(false);
-  const [tabungan, setTabungan] = useState<Tabungan[]>([]);
-  const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
+  const [tabungan, setTabungan] = useState<TabunganData[]>([]);
+  const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -27,10 +47,23 @@ export default function KeuanganPage() {
 
   const loadData = async () => {
     try {
-      const [tabunganData, transaksiData] = await Promise.all([
-        KeuanganService.getAllTabungan(),
-        KeuanganService.getAllTransaksi()
+      const [tabunganResponse, transaksiResponse] = await Promise.all([
+        fetch('/api/savings'),
+        fetch('/api/transactions')
       ]);
+      
+      if (!tabunganResponse.ok || !transaksiResponse.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      
+      const [tabunganData, transaksiData] = await Promise.all([
+        tabunganResponse.json(),
+        transaksiResponse.json()
+      ]);
+      
+      console.log('Loaded tabungan:', tabunganData);
+      console.log('Loaded transaksi:', transaksiData);
+      
       setTabungan(tabunganData);
       setTransaksi(transaksiData);
     } catch (error) {
@@ -43,7 +76,12 @@ export default function KeuanganPage() {
     setRefreshKey(prev => prev + 1);
   };
 
-  const totalSaldo = tabungan.reduce((total, t) => total + t.saldoSaatIni, 0);
+  const totalSaldo = tabungan.reduce((total, t) => {
+    console.log('Calculating total - t:', t, 'jumlah:', t.jumlah);
+    return total + t.jumlah;
+  }, 0);
+
+  console.log('Final total saldo:', totalSaldo);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -104,16 +142,16 @@ export default function KeuanganPage() {
 
           <TabsContent value="dashboard" className="space-y-6">
             <DashboardTab 
-              tabungan={tabungan} 
-              transaksi={transaksi}
+              tabungan={tabungan as any} 
+              transaksi={transaksi as any}
               onDataUpdate={loadData}
             />
           </TabsContent>
 
           <TabsContent value="riwayat" className="space-y-6">
             <RiwayatTransaksiTab 
-              transaksi={transaksi}
-              tabungan={tabungan}
+              transaksi={transaksi as any}
+              tabungan={tabungan as any}
               onDataUpdate={loadData}
             />
           </TabsContent>
@@ -143,7 +181,7 @@ export default function KeuanganPage() {
       <TransaksiDialog
         open={showTransaksiDialog}
         onOpenChange={setShowTransaksiDialog}
-        tabungan={tabungan}
+        tabungan={tabungan as any}
         onSuccess={handleTransaksiSuccess}
       />
     </div>

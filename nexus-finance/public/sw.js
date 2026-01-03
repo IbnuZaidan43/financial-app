@@ -8,7 +8,6 @@ const urlsToCache = [
   '/icons/icon-512x512.png'
 ];
 
-// Install Service Worker
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -19,27 +18,21 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Fetch Service Worker
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Cache hit - return response
         if (response) {
           return response;
         }
 
-        // Clone the request
         const fetchRequest = event.request.clone();
 
         return fetch(fetchRequest).then(
           (response) => {
-            // Check if valid response
             if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
-
-            // Clone the response
             const responseToCache = response.clone();
 
             caches.open(CACHE_NAME)
@@ -50,14 +43,12 @@ self.addEventListener('fetch', (event) => {
             return response;
           }
         ).catch(() => {
-          // Return offline page if fetch fails
           return caches.match('/');
         });
       })
   );
 });
 
-// Activate Service Worker
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -73,14 +64,12 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Background Sync (for future use)
 self.addEventListener('sync', (event) => {
   if (event.tag === 'background-sync') {
     event.waitUntil(doBackgroundSync());
   }
 });
 
-// Push Notifications (for future use)
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'Ada notifikasi baru',
@@ -110,7 +99,6 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
@@ -121,9 +109,6 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Background sync function
 function doBackgroundSync() {
-  // This will be implemented for future features
-  // Like syncing data when online
   return Promise.resolve();
 }

@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { importTransactionsFromExcel } from '@/lib/excel-importer'
 import { db } from '@/lib/db'
 
+interface SavedTransaction {
+  id: number;
+  judul: string;
+  jumlah: number;
+  deskripsi: string | null;
+  tanggal: Date;
+  tipe: string;
+  kategoriId: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -11,22 +23,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
     }
     
-    // Validate file type
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
       return NextResponse.json({ error: 'Invalid file type. Please upload an Excel file (.xlsx or .xls)' }, { status: 400 })
     }
     
-    // Convert file to buffer
     const buffer = await file.arrayBuffer()
-    
-    // Import transactions from Excel
     const result = await importTransactionsFromExcel(buffer)
-    
-    // Save transactions to database
-    const savedTransactions = []
+    const savedTransactions: SavedTransaction[] = []
     for (const transData of result.transactions) {
       try {
-        // Find category by name
         let kategori = await db.kategori.findFirst({
           where: {
             nama: transData.kategori,
@@ -34,7 +39,6 @@ export async function POST(request: NextRequest) {
           }
         })
         
-        // If category not found, use "Lainnya"
         if (!kategori) {
           kategori = await db.kategori.findFirst({
             where: {
@@ -55,10 +59,9 @@ export async function POST(request: NextRequest) {
           }
         })
         
-        savedTransactions.push(transaction)
+        savedTransactions.push(transaction as SavedTransaction)
       } catch (error) {
         console.error('Error saving transaction:', error)
-        // Continue with other transactions
       }
     }
     
@@ -72,6 +75,7 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('Error importing transactions:', error)
-    return NextResponse.json({ error: 'Failed to import transactions: ' + error.message }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    return NextResponse.json({ error: 'Failed to import transactions: ' + errorMessage }, { status: 500 })
   }
 }

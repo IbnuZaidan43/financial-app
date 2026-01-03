@@ -121,7 +121,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header dengan tombol tambah */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Daftar Tabungan</h2>
@@ -183,7 +182,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Dialog>
       </div>
 
-      {/* Total Saldo Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
@@ -206,7 +204,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </CardContent>
       </Card>
 
-      {/* Daftar Tabungan */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tabungan.map((t) => (
           <Card key={t.id} className="hover:shadow-md transition-shadow">
@@ -275,7 +272,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         ))}
       </div>
 
-      {/* Empty State */}
       {tabungan.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
@@ -292,7 +288,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Card>
       )}
 
-      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>

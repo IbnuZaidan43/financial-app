@@ -3,53 +3,81 @@ import { db } from '@/lib/db'
 
 export async function GET() {
   try {
-    const tabungan = await db.tabungan.findMany({
+    const transaksi = await db.transaksi.findMany({
       orderBy: {
         createdAt: 'desc'
+      },
+      include: {
+        kategori: true
       }
     })
     
-    return NextResponse.json(tabungan)
+    return NextResponse.json(transaksi)
   } catch (error) {
-    console.error('Error fetching savings:', error)
-    return NextResponse.json({ error: 'Failed to fetch savings' }, { status: 500 })
+    console.error('Error fetching transactions:', error)
+    return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nama, target, targetDate } = body
+    const { judul, jumlah, deskripsi, tanggal, tipe, kategoriId } = body
     
-    const tabungan = await db.tabungan.create({
+    const transaksi = await db.transaksi.create({
       data: {
-        nama,
-        target: parseFloat(target),
-        targetDate: targetDate ? new Date(targetDate) : null,
-        jumlah: 0
+        judul,
+        jumlah: parseFloat(jumlah),
+        deskripsi: deskripsi || null,
+        tanggal: new Date(tanggal),
+        tipe,
+        kategoriId: kategoriId ? parseInt(kategoriId) : null
       }
     })
     
-    return NextResponse.json(tabungan, { status: 201 })
+    return NextResponse.json(transaksi, { status: 201 })
   } catch (error) {
-    console.error('Error creating savings:', error)
-    return NextResponse.json({ error: 'Failed to create savings' }, { status: 500 })
+    console.error('Error creating transaction:', error)
+    return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500 })
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, jumlah } = body
+    const { id, judul, jumlah, deskripsi, tanggal, tipe, kategoriId } = body
     
-    const tabungan = await db.tabungan.update({
+    const transaksi = await db.transaksi.update({
       where: { id: parseInt(id) },
-      data: { jumlah: parseFloat(jumlah) }
+      data: {
+        judul,
+        jumlah: parseFloat(jumlah),
+        deskripsi: deskripsi || null,
+        tanggal: new Date(tanggal),
+        tipe,
+        kategoriId: kategoriId ? parseInt(kategoriId) : null
+      }
     })
     
-    return NextResponse.json(tabungan)
+    return NextResponse.json(transaksi)
   } catch (error) {
-    console.error('Error updating savings:', error)
-    return NextResponse.json({ error: 'Failed to update savings' }, { status: 500 })
+    console.error('Error updating transaction:', error)
+    return NextResponse.json({ error: 'Failed to update transaction' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id } = body
+    
+    await db.transaksi.delete({
+      where: { id: parseInt(id) }
+    })
+    
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting transaction:', error)
+    return NextResponse.json({ error: 'Failed to delete transaction' }, { status: 500 })
   }
 }

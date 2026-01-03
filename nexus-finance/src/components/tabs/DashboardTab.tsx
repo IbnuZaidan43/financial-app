@@ -25,12 +25,30 @@ import {
 } from 'recharts';
 import type { Tabungan as PrismaTabungan, Transaksi as PrismaTransaksi } from '@prisma/client';
 
-type Tabungan = PrismaTabungan;
-type Transaksi = PrismaTransaksi;
+interface TabunganInterface {
+  id: number;
+  nama: string;
+  saldoAwal: number;
+  jumlah: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+interface TransaksiInterface {
+  id: number;
+  judul: string;
+  jumlah: number;
+  deskripsi?: string | null;
+  tanggal: string | Date;
+  tipe: string;
+  kategoriId?: number | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
 
 interface DashboardTabProps {
-  tabungan: Tabungan[];
-  transaksi: Transaksi[];
+  tabungan: TabunganInterface[];
+  transaksi: TransaksiInterface[];
   onDataUpdate: () => void;
 }
 
@@ -48,7 +66,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
     try {
       setLoading(true);
       
-      // Hitung dari transaksi yang sudah ada
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
@@ -69,7 +86,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
         })
         .reduce((sum, t) => sum + t.jumlah, 0);
 
-      // Buat statistik bulanan sederhana
       const statistik = transaksi.reduce((acc: any[], t) => {
         const tDate = new Date(t.tanggal);
         const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
@@ -88,7 +104,7 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
         }
         
         return acc;
-      }, []).slice(-6); // 6 bulan terakhir
+      }, []).slice(-6);
 
       setPemasukanBulanIni(pemasukan);
       setPengeluaranBulanIni(pengeluaran);
@@ -102,8 +118,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
 
   const totalSaldo = tabungan.reduce((total, t) => total + t.jumlah, 0);
   const bulanIni = new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-
-  // Format data untuk chart
   const chartData = statistikBulanan.map(stat => ({
     bulan: stat.bulan,
     pemasukan: stat.pemasukan,
@@ -138,7 +152,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -207,9 +220,7 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Grafik Saldo Bulanan */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -273,7 +284,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
           </CardContent>
         </Card>
 
-        {/* Grafik Pemasukan vs Pengeluaran */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -332,7 +342,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
         </Card>
       </div>
 
-      {/* Recent Savings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

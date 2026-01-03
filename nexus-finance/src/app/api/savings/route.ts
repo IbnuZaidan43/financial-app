@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import type { Tabungan } from '@prisma/client'
 
 export async function GET() {
   try {
