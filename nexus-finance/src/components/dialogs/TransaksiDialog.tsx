@@ -1,18 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { useFinancial } from '@/lib/financial-context';
 import { 
   ArrowUpRight, 
   ArrowDownRight,
   Calendar,
   DollarSign,
-  Wallet
+  Wallet,
+  Building,
+  Smartphone,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 
 interface TabunganData {
@@ -28,17 +33,64 @@ interface TransaksiDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tabungan: TabunganData[];
-  onSuccess: () => void;
 }
 
-export default function TransaksiDialog({ open, onOpenChange, tabungan, onSuccess }: TransaksiDialogProps) {
+export default function TransaksiDialog({ open, onOpenChange, tabungan }: TransaksiDialogProps) {
+  const { refreshTransaksi, refreshTabungan } = useFinancial();
   const [formData, setFormData] = useState({
-    tipe: '' as 'pemasukan' | 'pengeluaran',
+    tipe: 'pemasukan' as 'pemasukan' | 'pengeluaran',
     jumlah: '',
     deskripsi: '',
     tabunganId: '',
     tanggal: new Date().toISOString().split('T')[0]
   });
+
+  // Fungsi untuk mendeteksi kategori dari nama tabungan
+  const getKategoriFromNama = (nama: string) => {
+    const lowerNama = nama.toLowerCase();
+    if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
+        lowerNama.includes('bri') || lowerNama.includes('cimb') || lowerNama.includes('danamon') ||
+        lowerNama.includes('permata') || lowerNama.includes('bank')) {
+      return 'bank';
+    } else if (lowerNama.includes('gopay') || lowerNama.includes('ovo') || lowerNama.includes('dana') || 
+               lowerNama.includes('shopeepay') || lowerNama.includes('linkaja') || lowerNama.includes('sakuku')) {
+      return 'e-wallet';
+    } else if (lowerNama.includes('ktm') || lowerNama.includes('tapcash') || lowerNama.includes('flazz') || lowerNama.includes('brizzi') || 
+               lowerNama.includes('emoney') || lowerNama.includes('ezlink')) {
+      return 'e-money';
+    } else if (lowerNama.includes('cash') || lowerNama.includes('tunai') || lowerNama.includes('uang')) {
+      return 'cash';
+    }
+    return 'lainnya';
+  };
+
+  // Fungsi untuk mendapatkan icon berdasarkan kategori
+  const getKategoriIcon = (kategori: string) => {
+    switch (kategori) {
+      case 'bank': return <Building className="h-4 w-4" />;
+      case 'e-wallet': return <Smartphone className="h-4 w-4" />;
+      case 'e-money': return <CreditCard className="h-4 w-4" />;
+      case 'cash': return <Banknote className="h-4 w-4" />;
+      default: return <Wallet className="h-4 w-4" />;
+    }
+  };
+
+  // Fungsi untuk mendapatkan warna berdasarkan kategori
+  const getKategoriColor = (kategori: string) => {
+    switch (kategori) {
+      case 'bank': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'e-wallet': return 'bg-green-100 text-green-700 border-green-200';
+      case 'e-money': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'cash': return 'bg-orange-100 text-orange-700 border-orange-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  // Fungsi untuk filter tabungan berdasarkan tipe transaksi
+  const getFilteredTabungan = () => {
+    // Tidak ada filter - semua tabungan bisa digunakan untuk pemasukan dan pengeluaran
+    return tabungan;
+  };
 
   const resetForm = () => {
     setFormData({
@@ -65,12 +117,17 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan, onSucces
         return;
       }
 
-      const response = await fetch('/api/transactions', {
+      console.log('📝 Creating transaction...');
+      
+      // Create transaction dengan tabunganId yang benar
+      // API akan otomatis mengupdate balance tabungan
+      const response = await fetch('/api/transactions?XTransformPort=3000', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          tabunganId: selectedTabungan.id,
           judul: formData.deskripsi || 'Transaksi',
           jumlah: parseFloat(formData.jumlah.replace(/\./g, '')),
           deskripsi: formData.deskripsi || 'Transaksi tanpa keterangan',
@@ -81,36 +138,27 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan, onSucces
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create transaction');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create transaction');
       }
 
-      const currentJumlah = selectedTabungan.jumlah;
-      const newJumlah = formData.tipe === 'pemasukan' 
-        ? currentJumlah + parseFloat(formData.jumlah.replace(/\./g, ''))
-        : currentJumlah - parseFloat(formData.jumlah.replace(/\./g, ''));
-
-      await fetch('/api/savings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: selectedTabungan.id,
-          jumlah: newJumlah
-        }),
-      });
-
+      const transaction = await response.json();
+      console.log('✅ Transaction created:', transaction);
+      
+      // Reset form dan tutup dialog
       resetForm();
       onOpenChange(false);
-      onSuccess();
+      
+      // Refresh data untuk update UI
+      console.log('🔄 Refreshing data...');
+      await refreshTransaksi();
+      await refreshTabungan();
+      console.log('✅ Data refreshed');
+      
     } catch (error) {
-      console.error('Error creating transaksi:', error);
-      alert('Gagal menyimpan transaksi');
+      console.error('❌ Error creating transaksi:', error);
+      alert('Gagal menyimpan transaksi: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
-  };
-
-  const getTabunganIcon = () => {
-    return '💰';
   };
 
   return (
@@ -127,6 +175,9 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan, onSucces
             )}
             Tambah Transaksi
           </DialogTitle>
+          <DialogDescription>
+            Tambahkan pemasukan atau pengeluaran untuk tabungan Anda
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -191,17 +242,22 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan, onSucces
                 <SelectValue placeholder="Pilih tabungan" />
               </SelectTrigger>
               <SelectContent>
-                {tabungan.map((t) => (
-                  <SelectItem key={t.id} value={t.id!.toString()}>
-                    <div className="flex items-center gap-2">
-                      <span>{getTabunganIcon()}</span>
-                      <span>{t.nama}</span>
-                      <Badge variant="outline" className="text-xs ml-auto">
-                        Tabungan
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                ))}
+                {getFilteredTabungan().map((t) => {
+                  const kategori = getKategoriFromNama(t.nama);
+                  return (
+                    <SelectItem key={t.id} value={t.id!.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1 rounded ${getKategoriColor(kategori)}`}>
+                          {getKategoriIcon(kategori)}
+                        </div>
+                        <span>{t.nama}</span>
+                        <Badge variant="outline" className={`text-xs ml-auto ${getKategoriColor(kategori)}`}>
+                          {kategori.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

@@ -41,12 +41,16 @@ export function useTransactions() {
   const fetchTransactions = async () => {
     try {
       setLoading(true)
+      setError(null)
+      console.log('🔄 fetchTransactions called')
       const response = await fetch('/api/transactions')
       if (!response.ok) throw new Error('Failed to fetch transactions')
       const data = await response.json()
+      console.log('✅ fetchTransactions success:', data)
       setTransactions(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
+      console.error('Error fetching transactions:', err)
     } finally {
       setLoading(false)
     }
@@ -92,12 +96,16 @@ export function useSavings() {
   const fetchSavings = async () => {
     try {
       setLoading(true)
+      setError(null)
+      console.log('🔄 fetchSavings called')
       const response = await fetch('/api/savings')
       if (!response.ok) throw new Error('Failed to fetch savings')
       const data = await response.json()
+      console.log('✅ fetchSavings success:', data)
       setSavings(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
+      console.error('Error fetching savings:', err)
     } finally {
       setLoading(false)
     }
@@ -122,17 +130,22 @@ export function useSavings() {
     }
   }
 
-  const updateSavings = async (id: number, jumlah: number) => {
+  // ✅ Method untuk update balance (transaksi)
+  const updateBalance = async (id: number, jumlah: number) => {
     try {
-      const response = await fetch('/api/savings', {
+      console.log('🔄 updateBalance called:', { id, jumlah })
+      const response = await fetch('/api/savings/balance', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id, jumlah }),
       })
-      if (!response.ok) throw new Error('Failed to update savings')
+      if (!response.ok) throw new Error('Failed to update balance')
       const updatedSavings = await response.json()
+      console.log('✅ updateBalance success:', updatedSavings)
+      
+      // ✅ Update local state langsung untuk auto-refresh
       setSavings(prev => 
         prev.map(saving => 
           saving.id === id ? updatedSavings : saving
@@ -141,6 +154,36 @@ export function useSavings() {
       return updatedSavings
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
+      console.error('Error updating balance:', err)
+      throw err
+    }
+  }
+
+  // ✅ Method untuk edit tabungan (nama & saldoAwal)
+  const updateSavings = async (id: number, data: { nama?: string; saldoAwal?: number }) => {
+    try {
+      console.log('🔄 updateSavings called:', { id, data })
+      const response = await fetch('/api/savings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, ...data }),
+      })
+      if (!response.ok) throw new Error('Failed to update savings')
+      const updatedSavings = await response.json()
+      console.log('✅ updateSavings success:', updatedSavings)
+      
+      // ✅ Update local state
+      setSavings(prev => 
+        prev.map(saving => 
+          saving.id === id ? updatedSavings : saving
+        )
+      )
+      return updatedSavings
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+      console.error('Error updating savings:', err)
       throw err
     }
   }
@@ -155,7 +198,8 @@ export function useSavings() {
     error,
     refetch: fetchSavings,
     createSavings,
-    updateSavings
+    updateSavings,
+    updateBalance  // ✅ Export method baru
   }
 }
 

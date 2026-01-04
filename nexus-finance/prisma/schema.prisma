@@ -33,10 +33,12 @@ model Transaksi {
   tanggal     DateTime
   tipe        String    // "pemasukan" atau "pengeluaran"
   kategoriId  Int?
+  tabunganId  Int?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   
   kategori    Kategori? @relation(fields: [kategoriId], references: [id])
+  tabungan    Tabungan? @relation(fields: [tabunganId], references: [id])
   
   @@map("transaksi")
 }
@@ -48,6 +50,8 @@ model Tabungan {
   jumlah    Float     @default(0)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  
+  transaksi Transaksi[]
   
   @@map("tabungan")
 }

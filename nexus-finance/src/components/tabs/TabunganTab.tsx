@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Plus, 
   Wallet, 
@@ -14,9 +13,13 @@ import {
   Smartphone, 
   DollarSign,
   Edit,
-  Trash2
+  Trash2,
+  Building,
+  CreditCard as CreditCardIcon,
+  Smartphone as SmartphoneIcon,
+  Banknote
 } from 'lucide-react';
-import { useSavings } from '@/hooks/use-api';
+import { useFinancial } from '@/lib/financial-context';
 import type { Tabungan as PrismaTabungan } from '@prisma/client';
 
 type Tabungan = PrismaTabungan;
@@ -26,7 +29,8 @@ interface TabunganTabProps {
 }
 
 export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
-  const { savings: tabungan, refetch } = useSavings();
+  // ✅ Gunakan financial context
+  const { tabungan, refreshTabungan } = useFinancial();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingTabungan, setEditingTabungan] = useState<Tabungan | null>(null);
@@ -35,6 +39,58 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     saldoAwal: ''
   });
 
+  // Fungsi untuk mendeteksi kategori dari nama tabungan
+  const getKategoriFromNama = (nama: string) => {
+    const lowerNama = nama.toLowerCase();
+    if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
+        lowerNama.includes('bri') || lowerNama.includes('cimb') || lowerNama.includes('danamon') ||
+        lowerNama.includes('permata') || lowerNama.includes('bank')) {
+      return 'bank';
+    } else if (lowerNama.includes('gopay') || lowerNama.includes('ovo') || lowerNama.includes('dana') || 
+               lowerNama.includes('shopeepay') || lowerNama.includes('linkaja') || lowerNama.includes('sakuku')) {
+      return 'e-wallet';
+    } else if (lowerNama.includes('ktm') || lowerNama.includes('tapcash') || lowerNama.includes('flazz') || lowerNama.includes('brizzi') || 
+               lowerNama.includes('emoney') || lowerNama.includes('ezlink')) {
+      return 'e-money';
+    } else if (lowerNama.includes('cash') || lowerNama.includes('tunai') || lowerNama.includes('uang')) {
+      return 'cash';
+    }
+    return 'lainnya';
+  };
+
+  // Fungsi untuk mendapatkan icon berdasarkan kategori
+  const getKategoriIcon = (kategori: string) => {
+    switch (kategori) {
+      case 'bank': return <Building className="h-5 w-5" />;
+      case 'e-wallet': return <SmartphoneIcon className="h-5 w-5" />;
+      case 'e-money': return <CreditCardIcon className="h-5 w-5" />;
+      case 'cash': return <Banknote className="h-5 w-5" />;
+      default: return <Wallet className="h-5 w-5" />;
+    }
+  };
+
+  // Fungsi untuk mendapatkan warna berdasarkan kategori
+  const getKategoriColor = (kategori: string) => {
+    switch (kategori) {
+      case 'bank': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'e-wallet': return 'bg-green-100 text-green-700 border-green-200';
+      case 'e-money': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'cash': return 'bg-orange-100 text-orange-700 border-orange-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  // Fungsi untuk mendapatkan emoji berdasarkan kategori
+  const getKategoriEmoji = (kategori: string) => {
+    switch (kategori) {
+      case 'bank': return '🏦';
+      case 'e-wallet': return '📱';
+      case 'e-money': return '💳';
+      case 'cash': return '💵';
+      default: return '💰';
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       nama: '',
@@ -42,7 +98,15 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetAllForm = () => {
+    setFormData({
+      nama: '',
+      saldoAwal: ''
+    });
+    setEditingTabungan(null);
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.nama) {
@@ -51,6 +115,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
 
     try {
+      console.log('🔄 Adding new tabungan...');
       const response = await fetch('/api/savings', {
         method: 'POST',
         headers: {
@@ -58,24 +123,62 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         },
         body: JSON.stringify({
           nama: formData.nama,
-          saldoAwal: formData.saldoAwal.replace(/\./g, '') || '0'
+          saldoAwal: parseFloat(formData.saldoAwal.replace(/\./g, '')) || 0,
+          jumlah: parseFloat(formData.saldoAwal.replace(/\./g, '')) || 0
         }),
       });
 
       if (response.ok) {
+        console.log('✅ Tabungan created');
         setShowAddDialog(false);
-        setShowEditDialog(false);
-        setEditingTabungan(null);
         resetForm();
-        refetch();
+        refreshTabungan();
         onDataUpdate();
-        alert('Tabungan berhasil disimpan');
+        alert('Tabungan berhasil ditambah');
       } else {
-        throw new Error('Gagal menyimpan tabungan');
+        throw new Error('Gagal menambah tabungan');
       }
     } catch (error) {
-      console.error('Error saving tabungan:', error);
-      alert('Gagal menyimpan tabungan');
+      console.error('Error adding tabungan:', error);
+      alert('Gagal menambah tabungan');
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.nama || !editingTabungan) {
+      alert('Mohon lengkapi nama tabungan');
+      return;
+    }
+
+    try {
+      console.log('🔄 Updating tabungan...');
+      const response = await fetch('/api/savings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingTabungan.id,
+          nama: formData.nama,
+          saldoAwal: parseFloat(formData.saldoAwal.replace(/\./g, '')) || 0
+        }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Tabungan updated');
+        setShowEditDialog(false);
+        resetAllForm();
+        refreshTabungan();
+        onDataUpdate();
+        alert('Tabungan berhasil diupdate');
+      } else {
+        throw new Error('Gagal mengupdate tabungan');
+      }
+    } catch (error) {
+      console.error('Error updating tabungan:', error);
+      alert('Gagal mengupdate tabungan');
     }
   };
 
@@ -91,12 +194,14 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
   const handleDelete = async (id: number, nama: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus tabungan "${nama}"?`)) {
       try {
+        console.log('🔄 Deleting tabungan:', { id, nama });
         const response = await fetch(`/api/savings/${id}`, {
           method: 'DELETE',
         });
 
         if (response.ok) {
-          refetch();
+          console.log('✅ Tabungan deleted');
+          refreshTabungan();
           onDataUpdate();
           alert('Tabungan berhasil dihapus');
         } else {
@@ -109,15 +214,21 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
   };
 
-  const getTabunganIcon = () => {
-    return <Wallet className="h-5 w-5" />;
-  };
-
-  const getTabunganLabel = () => {
-    return 'Tabungan';
-  };
-
   const totalSaldo = tabungan.reduce((total, t) => total + t.jumlah, 0);
+
+  // Group tabungan by kategori
+  const tabunganByKategori = tabungan.reduce((acc, t) => {
+    const kategori = getKategoriFromNama(t.nama);
+    if (!acc[kategori]) acc[kategori] = [];
+    acc[kategori].push(t);
+    return acc;
+  }, {} as Record<string, Tabungan[]>);
+
+  const totalSaldoByKategori = Object.entries(tabunganByKategori).map(([kategori, items]) => ({
+    kategori,
+    total: items.reduce((sum, t) => sum + t.jumlah, 0),
+    count: items.length
+  }));
 
   return (
     <div className="space-y-6">
@@ -137,7 +248,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
             <DialogHeader>
               <DialogTitle>Tambah Tabungan Baru</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Nama Tabungan</label>
                 <Input
@@ -146,6 +257,9 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                   onChange={(e) => setFormData({...formData, nama: e.target.value})}
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Kategori akan otomatis dideteksi dari nama (bank, e-wallet, e-money, cash)
+                </p>
               </div>
               
               <div>
@@ -182,6 +296,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Dialog>
       </div>
 
+      {/* Total Saldo Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
@@ -204,73 +319,115 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tabungan.map((t) => (
-          <Card key={t.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                    {getTabunganIcon()}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{t.nama}</h3>
-                    <Badge variant="outline" className="text-xs">
-                      {getTabunganLabel()}
-                    </Badge>
-                  </div>
+      {/* Total Saldo by Kategori */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {totalSaldoByKategori.map(({ kategori, total, count }) => (
+          <Card key={kategori} className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`p-2 rounded-lg ${getKategoriColor(kategori)}`}>
+                  {getKategoriIcon(kategori)}
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(t)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(t.id!, t.nama)}
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                <div>
+                  <h4 className="font-semibold capitalize">{kategori}</h4>
+                  <p className="text-xs text-gray-500">{count} tabungan</p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-sm text-gray-600">Saldo Saat Ini</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {new Intl.NumberFormat('id-ID', {
-                      style: 'currency',
-                      currency: 'IDR',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0
-                    }).format(t.jumlah)}
-                  </p>
-                </div>
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-gray-500">
-                    Saldo Awal: {new Intl.NumberFormat('id-ID', {
-                      style: 'currency',
-                      currency: 'IDR',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0
-                    }).format(t.saldoAwal)}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Dibuat: {new Date(t.createdAt).toLocaleDateString('id-ID')}
-                  </p>
-                </div>
+              <div className="text-lg font-bold">
+                {new Intl.NumberFormat('id-ID', {
+                  style: 'currency',
+                  currency: 'IDR',
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0
+                }).format(total)}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Daftar Tabungan by Kategori */}
+      {Object.entries(tabunganByKategori).map(([kategori, items]) => (
+        <div key={kategori} className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-lg ${getKategoriColor(kategori)}`}>
+              {getKategoriIcon(kategori)}
+            </div>
+            <h3 className="text-lg font-semibold capitalize">{kategori}</h3>
+            <Badge variant="outline" className="text-xs">
+              {items.length} tabungan
+            </Badge>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {items.map((t) => (
+              <Card key={t.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${getKategoriColor(kategori)}`}>
+                        {getKategoriIcon(kategori)}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">{t.nama}</h3>
+                        <Badge variant="outline" className={`text-xs ${getKategoriColor(kategori)}`}>
+                          {kategori.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(t)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(t.id!, t.nama)}
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm text-gray-600">Saldo Saat Ini</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {new Intl.NumberFormat('id-ID', {
+                          style: 'currency',
+                          currency: 'IDR',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        }).format(t.jumlah)}
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-gray-500">
+                        Saldo Awal: {new Intl.NumberFormat('id-ID', {
+                          style: 'currency',
+                          currency: 'IDR',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        }).format(t.saldoAwal)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Dibuat: {new Date(t.createdAt).toLocaleDateString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {tabungan.length === 0 && (
         <Card>
@@ -288,12 +445,13 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Card>
       )}
 
+      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Tabungan</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleEditSubmit} className="space-y-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Nama Tabungan</label>
               <Input
@@ -302,6 +460,9 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                 onChange={(e) => setFormData({...formData, nama: e.target.value})}
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Ubah nama tabungan tidak akan mengubah kategori
+              </p>
             </div>
             
             <div>
@@ -316,6 +477,9 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                   setFormData({...formData, saldoAwal: formatted});
                 }}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Perubahan saldo awal akan menyesuaikan saldo saat ini
+              </p>
             </div>
             
             <div className="flex gap-2 pt-4">
@@ -327,8 +491,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                 variant="outline" 
                 onClick={() => {
                   setShowEditDialog(false);
-                  setEditingTabungan(null);
-                  resetForm();
+                  resetAllForm();
                 }}
               >
                 Batal
