@@ -1,11 +1,34 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Tabungan, Transaksi } from '@prisma/client';
 
+// Interface untuk data dari API (mungkin berbeda dari Prisma types)
+interface TabunganData {
+  id: number;
+  nama: string;
+  saldoAwal: number;
+  jumlah: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+interface TransaksiData {
+  id: number;
+  judul: string;
+  jumlah: number;
+  deskripsi: string | null;
+  tanggal: string | Date;
+  tipe: string;
+  kategoriId: number | null;
+  tabunganId: number | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 interface FinancialContextType {
-  tabungan: Tabungan[];
-  transaksi: Transaksi[];
+  tabungan: TabunganData[];
+  transaksi: TransaksiData[];
   refreshTabungan: () => Promise<void>;
   refreshTransaksi: () => Promise<void>;
   updateTabunganBalance: (id: number, newBalance: number) => void;
@@ -13,13 +36,27 @@ interface FinancialContextType {
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
 
+// Helper function untuk mendapatkan API URL berdasarkan environment
+const getApiUrl = (endpoint: string) => {
+  if (process.env.NODE_ENV === 'development') {
+    return `${endpoint}?XTransformPort=3000`;
+  }
+  return endpoint;
+};
+
 export function FinancialProvider({ children }: { children: ReactNode }) {
-  const [tabungan, setTabungan] = useState<Tabungan[]>([]);
-  const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
+  const [tabungan, setTabungan] = useState<TabunganData[]>([]);
+  const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
 
   const refreshTabungan = async () => {
     try {
-      const response = await fetch('/api/savings');
+      console.log('🔄 Refreshing tabungan...');
+      const response = await fetch(getApiUrl('/api/savings'));
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch savings: ${response.status}`);
+      }
+      
       const data = await response.json();
       setTabungan(data);
       console.log('✅ Tabungan refreshed:', data);
@@ -30,7 +67,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
   const refreshTransaksi = async () => {
     try {
-      const response = await fetch('/api/transactions');
+      console.log('🔄 Refreshing transaksi...');
+      const response = await fetch(getApiUrl('/api/transactions'));
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch transactions: ${response.status}`);
+      }
+      
       const data = await response.json();
       setTransaksi(data);
       console.log('✅ Transaksi refreshed:', data);
@@ -49,11 +92,12 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     console.log('✅ Balance updated in context');
   };
 
-  // Initial load
-  useState(() => {
+  // Initial load menggunakan useEffect (bukan useState)
+  useEffect(() => {
+    console.log('🚀 FinancialProvider mounted, loading initial data...');
     refreshTabungan();
     refreshTransaksi();
-  });
+  }, []);
 
   return (
     <FinancialContext.Provider value={{

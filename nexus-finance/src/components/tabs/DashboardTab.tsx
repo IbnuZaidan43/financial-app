@@ -10,7 +10,11 @@ import {
   Wallet,
   Calendar,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Building,
+  Smartphone,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -57,6 +61,47 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
   const [pengeluaranBulanIni, setPengeluaranBulanIni] = useState(0);
   const [statistikBulanan, setStatistikBulanan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Fungsi untuk mendeteksi kategori dari nama tabungan
+  const getKategoriFromNama = (nama: string) => {
+    const lowerNama = nama.toLowerCase();
+    if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
+        lowerNama.includes('bri') || lowerNama.includes('cimb') || lowerNama.includes('danamon') ||
+        lowerNama.includes('permata') || lowerNama.includes('bank')) {
+      return 'bank';
+    } else if (lowerNama.includes('gopay') || lowerNama.includes('ovo') || lowerNama.includes('dana') || 
+               lowerNama.includes('shopeepay') || lowerNama.includes('linkaja') || lowerNama.includes('sakuku')) {
+      return 'e-wallet';
+    } else if (lowerNama.includes('ktm') || lowerNama.includes('tapcash') || lowerNama.includes('flazz') || lowerNama.includes('brizzi') || 
+               lowerNama.includes('emoney') || lowerNama.includes('ezlink')) {
+      return 'e-money';
+    } else if (lowerNama.includes('cash') || lowerNama.includes('tunai') || lowerNama.includes('uang')) {
+      return 'cash';
+    }
+    return 'lainnya';
+  };
+
+  // Fungsi untuk mendapatkan icon berdasarkan kategori
+  const getKategoriIcon = (kategori: string) => {
+    switch (kategori) {
+      case 'bank': return <Building className="h-3 w-3" />;
+      case 'e-wallet': return <Smartphone className="h-3 w-3" />;
+      case 'e-money': return <CreditCard className="h-3 w-3" />;
+      case 'cash': return <Banknote className="h-3 w-3" />;
+      default: return <Wallet className="h-3 w-3" />;
+    }
+  };
+
+  // Fungsi untuk mendapatkan warna berdasarkan kategori
+  const getKategoriColor = (kategori: string) => {
+    switch (kategori) {
+      case 'bank': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'e-wallet': return 'bg-green-100 text-green-700 border-green-200';
+      case 'e-money': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'cash': return 'bg-orange-100 text-orange-700 border-orange-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -352,27 +397,33 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
         <CardContent>
           {tabungan.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tabungan.map((t) => (
-                <div key={t.id} className="p-4 border rounded-lg">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium">{t.nama}</h4>
-                    <Badge variant="outline" className="text-xs">
-                      Tabungan
-                    </Badge>
+              {tabungan.map((t) => {
+                const kategori = getKategoriFromNama(t.nama);
+                return (
+                  <div key={t.id} className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium">{t.nama}</h4>
+                      <Badge variant="outline" className={`text-xs ${getKategoriColor(kategori)}`}>
+                        <span className="flex items-center gap-1">
+                          {getKategoriIcon(kategori)}
+                          {kategori.toUpperCase()}
+                        </span>
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Saldo: {new Intl.NumberFormat('id-ID', {
+                        style: 'currency',
+                        currency: 'IDR',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      }).format(t.jumlah)}
+                    </p>
+                    <div className="text-xs text-gray-500">
+                      Dibuat: {new Date(t.createdAt).toLocaleDateString('id-ID')}
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Saldo: {new Intl.NumberFormat('id-ID', {
-                      style: 'currency',
-                      currency: 'IDR',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0
-                    }).format(t.jumlah)}
-                  </p>
-                  <div className="text-xs text-gray-500">
-                    Dibuat: {new Date(t.createdAt).toLocaleDateString('id-ID')}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
