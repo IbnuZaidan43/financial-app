@@ -25,6 +25,19 @@ model Kategori {
   @@map("kategori")
 }
 
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  tabungan  Tabungan[]
+  transaksi Transaksi[]
+  
+  @@map("users")
+}
+
 model Transaksi {
   id          Int       @id @default(autoincrement())
   judul       String
@@ -34,11 +47,13 @@ model Transaksi {
   tipe        String    // "pemasukan" atau "pengeluaran"
   kategoriId  Int?
   tabunganId  Int?
+  userId      String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   
   kategori    Kategori? @relation(fields: [kategoriId], references: [id])
   tabungan    Tabungan? @relation(fields: [tabunganId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
   
   @@map("transaksi")
 }
@@ -48,10 +63,12 @@ model Tabungan {
   nama      String
   saldoAwal Float     @default(0)
   jumlah    Float     @default(0)
+  userId    String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   
   transaksi Transaksi[]
+  user      User      @relation(fields: [userId], references: [id])
   
   @@map("tabungan")
 }

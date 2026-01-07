@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export async function GET() {
+// Helper function untuk mendapatkan userId dari request
+const getUserIdFromRequest = (request: NextRequest) => {
+  const url = new URL(request.url);
+  return url.searchParams.get('userId') || 'default_user';
+};
+
+export async function GET(request: NextRequest) {
   try {
+    const userId = getUserIdFromRequest(request);
+    
+    console.log('🔍 Fetching transactions for userId:', userId);
+    
     const transaksi = await db.transaksi.findMany({
+      where: {
+        userId: userId  // ← NEW: Filter per user
+      },
       orderBy: {
         createdAt: 'desc'
       },
@@ -11,6 +24,8 @@ export async function GET() {
         kategori: true
       }
     })
+    
+    console.log('✅ Found', transaksi.length, 'transactions for user:', userId);
     
     return NextResponse.json(transaksi)
   } catch (error) {
@@ -22,9 +37,27 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { judul, jumlah, deskripsi, tanggal, tipe, kategoriId, tabunganId } = body
+    const { judul, jumlah, deskripsi, tanggal, tipe, kategoriId, tabunganId, userId } = body  // ← NEW: Ambil userId
     
-    console.log('📝 Creating transaction:', { judul, jumlah, deskripsi, tanggal, tipe, kategoriId, tabunganId });
+    // Use provided userId or default
+    const finalUserId = userId || 'default_user';
+    
+    console.log('📝 Creating transaction:', { judul, jumlah, deskripsi, tanggal, tipe, kategoriId, tabunganId, userId: finalUserId });
+    
+    // Verify user owns the tabungan if tabunganId is provided
+    if (tabunganId) {
+      const tabungan = await db.tabungan.findFirst({
+        where: {
+          id: parseInt(tabunganId),
+          userId: finalUserId  // ← NEW: Validate tabungan ownership
+        }
+      });
+      
+      if (!tabungan) {
+        console.log('❌ Tabungan not found or access denied for user:', finalUserId);
+        return NextResponse.json({ error: 'Tabungan not found or access denied' }, { status: 404 })
+      }
+    }
     
     // Create transaction
     const transaksi = await db.transaksi.create({
@@ -35,7 +68,8 @@ export async function POST(request: NextRequest) {
         tanggal: new Date(tanggal),
         tipe,
         kategoriId: kategoriId ? parseInt(kategoriId) : null,
-        tabunganId: tabunganId ? parseInt(tabunganId) : null
+        tabunganId: tabunganId ? parseInt(tabunganId) : null,
+        userId: finalUserId  // ← NEW: Tambah userId
       },
       include: {
         kategori: true
@@ -76,12 +110,40 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, judul, jumlah, deskripsi, tanggal, tipe, kategoriId, tabunganId } = body
+    const { id, judul, jumlah, deskripsi, tanggal, tipe, kategoriId, tabunganId, userId } = body  // ← NEW: Ambil userId
+    
+    // Use provided userId or default
+    const finalUserId = userId || 'default_user';
+    
+    console.log('🔄 Updating transaction for userId:', finalUserId, { id, judul, jumlah, deskripsi, tanggal, tipe, kategoriId, tabunganId });
     
     // Get original transaction for balance calculation
-    const originalTransaksi = await db.transaksi.findUnique({
-      where: { id: parseInt(id) }
+    const originalTransaksi = await db.transaksi.findFirst({
+      where: {
+        id: parseInt(id),
+        userId: finalUserId  // ← NEW: Validate ownership
+      }
     });
+    
+    if (!originalTransaksi) {
+      console.log('❌ Transaction not found or access denied for user:', finalUserId);
+      return NextResponse.json({ error: 'Transaction not found or access denied' }, { status: 404 })
+    }
+    
+    // Verify user owns the new tabungan if tabunganId is provided and changed
+    if (tabunganId && originalTransaksi.tabunganId !== parseInt(tabunganId)) {
+      const newTabungan = await db.tabungan.findFirst({
+        where: {
+          id: parseInt(tabunganId),
+          userId: finalUserId  // ← NEW: Validate new tabungan ownership
+        }
+      });
+      
+      if (!newTabungan) {
+        console.log('❌ New tabungan not found or access denied for user:', finalUserId);
+        return NextResponse.json({ error: 'New tabungan not found or access denied' }, { status: 404 })
+      }
+    }
     
     // Update transaction
     const transaksi = await db.transaksi.update({
@@ -166,6 +228,8 @@ export async function PUT(request: NextRequest) {
       }
     }
     
+    console.log('✅ Transaction updated:', transaksi);
+    
     return NextResponse.json(transaksi)
   } catch (error) {
     console.error('Error updating transaction:', error)
@@ -176,12 +240,25 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId } = body  // ← NEW: Ambil userId
+    
+    // Use provided userId or default
+    const finalUserId = userId || 'default_user';
+    
+    console.log('🗑️ Deleting transaction for userId:', finalUserId, { id });
     
     // Get transaction before deletion for balance calculation
-    const transaksi = await db.transaksi.findUnique({
-      where: { id: parseInt(id) }
+    const transaksi = await db.transaksi.findFirst({
+      where: {
+        id: parseInt(id),
+        userId: finalUserId  // ← NEW: Validate ownership
+      }
     });
+    
+    if (!transaksi) {
+      console.log('❌ Transaction not found or access denied for user:', finalUserId);
+      return NextResponse.json({ error: 'Transaction not found or access denied' }, { status: 404 })
+    }
     
     // Delete transaction
     await db.transaksi.delete({
@@ -203,8 +280,12 @@ export async function DELETE(request: NextRequest) {
           where: { id: transaksi.tabunganId },
           data: { jumlah: revertedBalance }
         });
+        
+        console.log('✅ Balance reverted successfully');
       }
     }
+    
+    console.log('✅ Transaction deleted successfully');
     
     return NextResponse.json({ success: true })
   } catch (error) {
