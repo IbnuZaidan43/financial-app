@@ -23,7 +23,15 @@ import TabunganTab from '@/components/tabs/TabunganTab';
 import FileTab from '@/components/tabs/FileTab';
 import TransaksiDialog from '@/components/dialogs/TransaksiDialog';
 
+import SimplePWATest from '@/components/SimplePWATest';
+
 export default function KeuanganPage() {
+  // Temporarily return simple PWA test for testing
+  return <SimplePWATest />;
+}
+
+// Original component - will be restored later
+function OriginalKeuanganPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showTransaksiDialog, setShowTransaksiDialog] = useState(false);
   

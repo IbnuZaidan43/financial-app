@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   keywords: ["keuangan", "pengelolaan keuangan", "aplikasi keuangan", "pemasukan", "pengeluaran", "tabungan", "budget"],
   authors: [{ name: "Keuangan App Team" }],
   icons: {
-    icon: "/app-icons/icon-1024x1024.svg",
-    apple: "/app-icons/icon-152x152.png",
+    icon: "/app-icons/icon-512x512.png",
+    apple: "/app-icons/icon-512x512.png",
   },
   manifest: "/manifest.json",
   appleWebApp: {
@@ -61,9 +61,9 @@ export default function RootLayout({
         <meta name="application-name" content="Keuangan" />
         <meta name="msapplication-TileColor" content="#3b82f6" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/app-icons/icon-152x152.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/app-icons/icon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/app-icons/icon-16x16.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/app-icons/icon-1024x1024.svg" />
+        <link rel="icon" type="image/svg+xml" sizes="32x32" href="/app-icons/icon-1024x1024.svg" />
+        <link rel="icon" type="image/svg+xml" sizes="16x16" href="/app-icons/icon-1024x1024.svg" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="shortcut icon" href="/favicon.ico" />
       </head>
@@ -77,17 +77,65 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // Enhanced service worker registration
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
+                  navigator.serviceWorker.register('/sw.js', {
+                    scope: '/'
+                  })
                     .then(function(registration) {
-                      console.log('SW registered: ', registration);
+                      console.log('✅ SW registered successfully:', registration);
+                      
+                      // Check for updates
+                      registration.addEventListener('updatefound', () => {
+                        console.log('🔄 SW update found');
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('🔄 SW updated, reloading page...');
+                            window.location.reload();
+                          }
+                        });
+                      });
                     })
                     .catch(function(registrationError) {
-                      console.log('SW registration failed: ', registrationError);
+                      console.error('❌ SW registration failed:', registrationError);
                     });
                 });
               }
+
+              // Listen for service worker messages
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                  console.log('📨 SW message:', event.data);
+                  
+                  // Forward to window for global handling
+                  window.dispatchEvent(new CustomEvent('swMessage', {
+                    detail: event.data
+                  }));
+                });
+              }
+
+              // Listen for beforeinstallprompt
+              window.addEventListener('beforeinstallprompt', (event) => {
+                console.log('📱 Install prompt detected in window');
+                // Store the event for later use
+                window.deferredPrompt = event;
+                
+                // Notify any listeners
+                window.dispatchEvent(new CustomEvent('beforeInstallPrompt', {
+                  detail: event
+                }));
+              });
+
+              // Listen for appinstalled
+              window.addEventListener('appinstalled', (event) => {
+                console.log('✅ App installed successfully');
+                window.deferredPrompt = null;
+                
+                // Notify any listeners
+                window.dispatchEvent(new CustomEvent('appinstalled'));
+              });
             `,
           }}
         />
