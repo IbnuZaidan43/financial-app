@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useAPI } from '@/hooks/use-enhanced-api';
+import { apiClient, type APIOptions, type APIResponse } from '@/lib/enhanced-api-client';
 
 // Interface untuk data dari API (mungkin berbeda dari Prisma types)
 interface TabunganData {
@@ -103,6 +105,39 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
   const [userId, setUserId] = useState<string>('default_user');
   
+  // NEW: Enhanced API hooks for caching (keep original state management)
+  const tabunganAPI = useAPI<TabunganData[]>('/api/savings', {
+    cacheStrategy: 'network-first',
+    maxAge: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    enabled: false, // We'll enable manually after userId is set
+    onSuccess: (data: TabunganData[], response: APIResponse<TabunganData[]>) => {
+      // Update original state when API succeeds
+      setTabungan(data);
+      console.log('🚀 Enhanced API: Tabungan updated with cache');
+    },
+    onError: (error: string) => {
+      console.warn('⚠️ Enhanced API: Tabungan fetch failed, falling back to original logic');
+    }
+  });
+
+  const transaksiAPI = useAPI<TransaksiData[]>('/api/transactions', {
+    cacheStrategy: 'network-first', 
+    maxAge: 1 * 60 * 1000, // 1 minute
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    enabled: false, // We'll enable manually after userId is set
+    onSuccess: (data: TransaksiData[], response: APIResponse<TransaksiData[]>) => {
+      // Update original state when API succeeds
+      setTransaksi(data);
+      console.log('🚀 Enhanced API: Transaksi updated with cache');
+    },
+    onError: (error: string) => {
+      console.warn('⚠️ Enhanced API: Transaksi fetch failed, falling back to original logic');
+    }
+  });
+  
   // NEW: Local storage integration
   const [dataSource, setDataSource] = useState<DataSource>('server');
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
@@ -130,6 +165,16 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     setUserId(currentUserId);
     console.log('👤 FinancialProvider initialized with userId:', currentUserId);
   }, []);
+
+  // NEW: Enable enhanced API hooks when userId is ready
+  useEffect(() => {
+    if (userId !== 'default_user') {
+      // Enable enhanced API hooks
+      tabunganAPI.execute();
+      transaksiAPI.execute();
+      console.log('🚀 Enhanced API hooks enabled for userId:', userId);
+    }
+  }, [userId]);
 
   // NEW: Update local storage userId when it changes
   useEffect(() => {
@@ -201,14 +246,25 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔄 Refreshing tabungan for userId:', userId);
       
-      // NEW: Try server first if online
+      // ENHANCED: Try enhanced API first, fallback to original logic
+      if (userId !== 'default_user') {
+        try {
+          await tabunganAPI.refetch();
+          console.log('✅ Tabungan refreshed using enhanced API');
+          return; // Success, exit early
+        } catch (apiError) {
+          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
+        }
+      }
+      
+      // ORIGINAL LOGIC: Fallback to original fetch implementation
       if (isStorageOnline) {
         const response = await fetch(getApiUrl('/api/savings', userId));
         
         if (response.ok) {
           const data = await response.json();
           setTabungan(data);
-          console.log('✅ Tabungan refreshed from server:', data, 'for user:', userId);
+          console.log('✅ Tabungan refreshed from server (original):', data, 'for user:', userId);
           
           // NEW: Save to local storage for offline access
           try {
@@ -239,14 +295,25 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔄 Refreshing transaksi for userId:', userId);
       
-      // NEW: Try server first if online
+      // ENHANCED: Try enhanced API first, fallback to original logic
+      if (userId !== 'default_user') {
+        try {
+          await transaksiAPI.refetch();
+          console.log('✅ Transaksi refreshed using enhanced API');
+          return; // Success, exit early
+        } catch (apiError) {
+          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
+        }
+      }
+      
+      // ORIGINAL LOGIC: Fallback to original fetch implementation
       if (isStorageOnline) {
         const response = await fetch(getApiUrl('/api/transactions', userId));
         
         if (response.ok) {
           const data = await response.json();
           setTransaksi(data);
-          console.log('✅ Transaksi refreshed from server:', data, 'for user:', userId);
+          console.log('✅ Transaksi refreshed from server (original):', data, 'for user:', userId);
           
           // NEW: Save to local storage for offline access
           try {
@@ -308,13 +375,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         console.log('📱 Local data loaded, refreshing from server...');
       });
       
-      // Then refresh from server
+      // Then refresh from server (enhanced API will handle this)
       refreshTabungan();
       refreshTransaksi();
     }
   }, [userId]); // ← Changed dependency from [] to [userId]
 
-  // ← NEW: Method to create savings with userId and local storage
+  // ← NEW: Method to create savings with enhanced API and original fallback
   const createTabungan = async (data: { nama: string; saldoAwal: number }) => {
     try {
       console.log('💾 Creating tabungan for userId:', userId, data);
@@ -339,7 +406,40 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         console.warn('⚠️ Failed to save tabungan to local storage:', saveError);
       }
       
-      // NEW: Try server if online
+      // ENHANCED: Try enhanced API client first
+      if (userId !== 'default_user') {
+        try {
+          const response = await apiClient.post('/api/savings', {
+            ...data,
+            userId: userId
+          }, {
+            cacheStrategy: 'network-only', // Don't cache POST requests
+            retryCount: 3,
+            retryDelay: 1000
+          });
+
+          if (response.fromCache === false) {
+            console.log('✅ Tabungan created using enhanced API:', response.data);
+            
+            // Replace temporary data with server data
+            setTabungan(prev => prev.map(t => t.id === tempTabungan.id ? response.data : t));
+            
+            // Update local storage with server data
+            try {
+              updateData(tabungan.map(t => t.id === tempTabungan.id ? response.data : t), transaksi);
+              console.log('💾 Local storage updated with server data');
+            } catch (saveError) {
+              console.warn('⚠️ Failed to update local storage:', saveError);
+            }
+            
+            return response.data;
+          }
+        } catch (apiError) {
+          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
+        }
+      }
+      
+      // ORIGINAL LOGIC: Fallback to original fetch implementation
       if (isStorageOnline) {
         const response = await fetch(getApiUrl('/api/savings'), {
           method: 'POST',
@@ -354,7 +454,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('✅ Tabungan created on server:', result);
+          console.log('✅ Tabungan created on server (original):', result);
           
           // Replace temporary data with server data
           setTabungan(prev => prev.map(t => t.id === tempTabungan.id ? result : t));
@@ -385,7 +485,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ← NEW: Method to create transaction with userId and local storage
+  // ← NEW: Method to create transaction with enhanced API and original fallback
   const createTransaksi = async (data: {
     judul: string;
     jumlah: number;
@@ -422,7 +522,46 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         console.warn('⚠️ Failed to save transaksi to local storage:', saveError);
       }
       
-      // NEW: Try server if online
+      // ENHANCED: Try enhanced API client first
+      if (userId !== 'default_user') {
+        try {
+          const response = await apiClient.post('/api/transactions', {
+            ...data,
+            userId: userId
+          }, {
+            cacheStrategy: 'network-only', // Don't cache POST requests
+            retryCount: 3,
+            retryDelay: 1000
+          });
+
+          if (response.fromCache === false) {
+            console.log('✅ Transaction created using enhanced API:', response.data);
+            
+            // Replace temporary data with server data
+            setTransaksi(prev => prev.map(t => t.id === tempTransaksi.id ? response.data : t));
+            
+            // Update local storage with server data
+            try {
+              updateData(
+                tabungan, 
+                transaksi.map(t => t.id === tempTransaksi.id ? response.data : t)
+              );
+              console.log('💾 Local storage updated with server data');
+            } catch (saveError) {
+              console.warn('⚠️ Failed to update local storage:', saveError);
+            }
+            
+            // Refresh tabungan to update balances
+            await refreshTabungan();
+            
+            return response.data;
+          }
+        } catch (apiError) {
+          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
+        }
+      }
+      
+      // ORIGINAL LOGIC: Fallback to original fetch implementation
       if (isStorageOnline) {
         const response = await fetch(getApiUrl('/api/transactions'), {
           method: 'POST',
@@ -437,7 +576,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('✅ Transaction created on server:', result);
+          console.log('✅ Transaction created on server (original):', result);
           
           // Replace temporary data with server data
           setTransaksi(prev => prev.map(t => t.id === tempTransaksi.id ? result : t));

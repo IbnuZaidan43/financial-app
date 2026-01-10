@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { FinancialProvider } from "@/lib/financial-context";
+import { AssetOptimizationDashboard } from "@/components/AssetOptimization";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -61,9 +62,9 @@ export default function RootLayout({
         <meta name="application-name" content="Keuangan" />
         <meta name="msapplication-TileColor" content="#3b82f6" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/app-icons/icon-1024x1024.svg" />
-        <link rel="icon" type="image/svg+xml" sizes="32x32" href="/app-icons/icon-1024x1024.svg" />
-        <link rel="icon" type="image/svg+xml" sizes="16x16" href="/app-icons/icon-1024x1024.svg" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/app-icons/icon-512x512.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/app-icons/icon-512x512.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/app-icons/icon-512x512.png" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="shortcut icon" href="/favicon.ico" />
       </head>
@@ -77,37 +78,111 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Enhanced service worker registration
+              // Enhanced service worker registration with Phase 2-C integration
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js', {
                     scope: '/'
                   })
                     .then(function(registration) {
-                      console.log('✅ SW registered successfully:', registration);
+                      console.log('✅ SW registered successfully:', registration.scope);
+                      
+                      // Store registration for global access
+                      window.swRegistration = registration;
+                      window.swActive = registration.active;
                       
                       // Check for updates
                       registration.addEventListener('updatefound', () => {
                         console.log('🔄 SW update found');
                         const newWorker = registration.installing;
-                        newWorker.addEventListener('statechange', () => {
-                          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            console.log('🔄 SW updated, reloading page...');
-                            window.location.reload();
-                          }
-                        });
+                        if (newWorker) {
+                          newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                              console.log('🔄 SW updated, reloading page...');
+                              // Notify about update
+                              window.dispatchEvent(new CustomEvent('swUpdateAvailable', {
+                                detail: { registration }
+                              }));
+                              // Auto reload after delay
+                              setTimeout(() => {
+                                window.location.reload();
+                              }, 2000);
+                            }
+                          });
+                        }
                       });
+                      
+                      // Handle controller change
+                      navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        console.log('🔄 SW controller changed');
+                        window.location.reload();
+                      });
+                      
+                      // Emit ready event for service worker manager
+                      window.dispatchEvent(new CustomEvent('swReady', {
+                        detail: { registration }
+                      }));
+                      
+                      // Initialize asset optimization
+                      console.log('🖼️ Initializing asset optimization...');
+                      // Asset optimization will be handled by the client-side hooks
                     })
                     .catch(function(registrationError) {
                       console.error('❌ SW registration failed:', registrationError);
+                      // Still emit ready event for fallback handling
+                      window.dispatchEvent(new CustomEvent('swError', {
+                        detail: { error: registrationError }
+                      }));
                     });
                 });
               }
 
-              // Listen for service worker messages
+              // Enhanced service worker message handling
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.addEventListener('message', (event) => {
-                  console.log('📨 SW message:', event.data);
+                  console.log('📨 SW message:', event.data.type, event.data);
+                  
+                  // Handle specific message types
+                  switch(event.data.type) {
+                    case 'API_OFFLINE':
+                      console.warn('📡 API offline, using cached data');
+                      window.dispatchEvent(new CustomEvent('apiOffline', {
+                        detail: event.data
+                      }));
+                      break;
+                      
+                    case 'SYNC_QUEUE_UPDATED':
+                      console.log('🔄 Sync queue updated:', event.data.queueLength);
+                      window.dispatchEvent(new CustomEvent('syncQueueUpdated', {
+                        detail: event.data
+                      }));
+                      break;
+                      
+                    case 'SYNC_COMPLETED':
+                      console.log('✅ Sync completed:', event.data.remaining);
+                      window.dispatchEvent(new CustomEvent('syncCompleted', {
+                        detail: event.data
+                      }));
+                      break;
+                      
+                    case 'CACHE_STATUS_RESPONSE':
+                      window.dispatchEvent(new CustomEvent('cacheStatus', {
+                        detail: event.data.status
+                      }));
+                      break;
+                      
+                    case 'BEFORE_INSTALL_PROMPT':
+                      console.log('📱 Install prompt from SW');
+                      window.dispatchEvent(new CustomEvent('beforeInstallPrompt', {
+                        detail: event.data.event
+                      }));
+                      break;
+                      
+                    case 'APP_INSTALLED':
+                      console.log('✅ App installed from SW');
+                      window.dispatchEvent(new CustomEvent('appinstalled'));
+                      break;
+                  }
                   
                   // Forward to window for global handling
                   window.dispatchEvent(new CustomEvent('swMessage', {
@@ -116,11 +191,16 @@ export default function RootLayout({
                 });
               }
 
-              // Listen for beforeinstallprompt
+              // Enhanced install prompt handling
               window.addEventListener('beforeinstallprompt', (event) => {
-                console.log('📱 Install prompt detected in window');
+                console.log('📱 Install prompt detected');
+                // Prevent default mini-infobar
+                event.preventDefault();
                 // Store the event for later use
                 window.deferredPrompt = event;
+                
+                // Update UI state
+                document.body.classList.add('install-prompt-available');
                 
                 // Notify any listeners
                 window.dispatchEvent(new CustomEvent('beforeInstallPrompt', {
@@ -128,13 +208,113 @@ export default function RootLayout({
                 }));
               });
 
-              // Listen for appinstalled
+              // Enhanced app installed handling
               window.addEventListener('appinstalled', (event) => {
                 console.log('✅ App installed successfully');
                 window.deferredPrompt = null;
                 
+                // Update UI state
+                document.body.classList.remove('install-prompt-available');
+                document.body.classList.add('app-installed');
+                
                 // Notify any listeners
                 window.dispatchEvent(new CustomEvent('appinstalled'));
+                
+                // Track installation if analytics available
+                if (typeof gtag !== 'undefined') {
+                  gtag('event', 'app_installed', {
+                    'event_category': 'PWA',
+                    'event_label': 'install_success'
+                  });
+                }
+              });
+
+              // Network status monitoring
+              function updateNetworkStatus() {
+                const isOnline = navigator.onLine;
+                console.log('🌐 Network status:', isOnline ? 'online' : 'offline');
+                
+                document.body.classList.toggle('offline', !isOnline);
+                document.body.classList.toggle('online', isOnline);
+                
+                window.dispatchEvent(new CustomEvent('networkStatusChanged', {
+                  detail: { online: isOnline }
+                }));
+              }
+
+              window.addEventListener('online', updateNetworkStatus);
+              window.addEventListener('offline', updateNetworkStatus);
+              
+              // Initial network status
+              updateNetworkStatus();
+
+              // Performance monitoring
+              if ('performance' in window) {
+                window.addEventListener('load', () => {
+                  setTimeout(() => {
+                    const perfData = performance.getEntriesByType('navigation')[0];
+                    console.log('⚡ Page load performance:', {
+                      domContentLoaded: perfData.domContentLoadedEventEnd - perfData.domContentLoadedEventStart,
+                      loadComplete: perfData.loadEventEnd - perfData.loadEventStart,
+                      totalTime: perfData.loadEventEnd - perfData.fetchStart
+                    });
+                  }, 0);
+                });
+              }
+
+              // Asset optimization and lazy loading
+              window.addEventListener('DOMContentLoaded', function() {
+                console.log('🖼️ Setting up asset optimization...');
+                
+                // Setup lazy loading for images
+                const lazyImages = document.querySelectorAll('img[data-src]');
+                if ('IntersectionObserver' in window) {
+                  const imageObserver = new IntersectionObserver((entries) => {
+                    entries.forEach((entry) => {
+                      if (entry.isIntersecting) {
+                        const img = entry.target as HTMLImageElement;
+                        const src = img.dataset.src;
+                        if (src) {
+                          img.src = src;
+                          img.classList.remove('lazy');
+                          img.classList.add('loaded');
+                        }
+                        imageObserver.unobserve(img);
+                      }
+                    });
+                  }, {
+                    rootMargin: '50px 0px',
+                    threshold: 0.1
+                  });
+                  
+                  lazyImages.forEach((img) => imageObserver.observe(img));
+                  console.log('🖼️ Lazy loading setup for', lazyImages.length, 'images');
+                } else {
+                  // Fallback for older browsers
+                  lazyImages.forEach((img) => {
+                    const src = img.dataset.src;
+                    if (src) {
+                      img.src = src;
+                    }
+                  });
+                }
+
+                // Preload critical assets
+                const criticalLinks = [
+                  { href: '/app-icons/icon-192x192.png', as: 'image' },
+                  { href: '/app-icons/icon-512x512.png', as: 'image' },
+                  { href: '/manifest.json', as: 'fetch' }
+                ];
+
+                criticalLinks.forEach(({ href, as }) => {
+                  const link = document.createElement('link');
+                  link.rel = 'preload';
+                  link.href = href;
+                  link.as = as;
+                  document.head.appendChild(link);
+                });
+
+                console.log('🚀 Critical assets preloaded');
               });
             `,
           }}
