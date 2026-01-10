@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { 
   Plus, 
   Wallet, 
@@ -14,6 +14,12 @@ import {
   DollarSign,
   Edit,
   Trash2,
+  Wifi,
+  WifiOff,
+  Database,
+  Cloud,
+  AlertCircle,
+  RefreshCw,
   Building,
   CreditCard as CreditCardIcon,
   Smartphone as SmartphoneIcon,
@@ -22,15 +28,32 @@ import {
 import { useFinancial } from '@/lib/financial-context';
 import type { Tabungan as PrismaTabungan } from '@prisma/client';
 
-type Tabungan = PrismaTabungan;
+// Use the same type as in financial context to avoid conflicts
+type Tabungan = {
+  id: number;
+  nama: string;
+  saldoAwal: number;
+  jumlah: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
 
 interface TabunganTabProps {
   onDataUpdate: () => void;
 }
 
 export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
-  // ✅ Gunakan financial context
-  const { tabungan, refreshTabungan } = useFinancial();
+  // NEW: Get financial context for sync status
+  const { 
+    isOnline, 
+    dataSource, 
+    syncStatus, 
+    lastSync, 
+    forceSync,
+    createTabungan,
+    tabungan
+  } = useFinancial();
+
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingTabungan, setEditingTabungan] = useState<Tabungan | null>(null);
@@ -38,6 +61,71 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     nama: '',
     saldoAwal: ''
   });
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // NEW: Helper functions for sync status
+  const getSyncIcon = () => {
+    switch (syncStatus) {
+      case 'synced': return <Database className="w-4 h-4" />;
+      case 'syncing': return <RefreshCw className="w-4 h-4 animate-spin" />;
+      case 'offline': return <WifiOff className="w-4 h-4" />;
+      case 'error': return <AlertCircle className="w-4 h-4" />;
+      default: return <Database className="w-4 h-4" />;
+    }
+  };
+
+  const getSyncColor = () => {
+    switch (syncStatus) {
+      case 'synced': return 'bg-green-100 text-green-800 border-green-300';
+      case 'syncing': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'offline': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'error': return 'bg-red-100 text-red-800 border-red-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getDataSourceIcon = () => {
+    switch (dataSource) {
+      case 'server': return <Cloud className="w-4 h-4" />;
+      case 'local': return <Database className="w-4 h-4" />;
+      case 'mixed': return <Database className="w-4 h-4" />;
+      default: return <Database className="w-4 h-4" />;
+    }
+  };
+
+  const getDataSourceColor = () => {
+    switch (dataSource) {
+      case 'server': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'local': return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'mixed': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const formatLastSync = (date: Date | null) => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  // NEW: Handle manual sync
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    try {
+      await forceSync();
+      await onDataUpdate(); // Refresh parent data
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Fungsi untuk mendeteksi kategori dari nama tabungan
   const getKategoriFromNama = (nama: string) => {
@@ -80,17 +168,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
   };
 
-  // Fungsi untuk mendapatkan emoji berdasarkan kategori
-  const getKategoriEmoji = (kategori: string) => {
-    switch (kategori) {
-      case 'bank': return '🏦';
-      case 'e-wallet': return '📱';
-      case 'e-money': return '💳';
-      case 'cash': return '💵';
-      default: return '💰';
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       nama: '',
@@ -106,7 +183,8 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     setEditingTabungan(null);
   };
 
-  const handleAddSubmit = async (e: React.FormEvent) => {
+  // NEW: Enhanced submit with local storage support
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.nama) {
@@ -115,33 +193,35 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
 
     try {
-      console.log('🔄 Adding new tabungan...');
-      const response = await fetch('/api/savings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nama: formData.nama,
-          saldoAwal: parseFloat(formData.saldoAwal.replace(/\./g, '')) || 0,
-          jumlah: parseFloat(formData.saldoAwal.replace(/\./g, '')) || 0
-        }),
-      });
+      // Use createTabungan from financial context for offline support
+      const tabunganData = {
+        nama: formData.nama,
+        saldoAwal: parseFloat(formData.saldoAwal.replace(/\./g, '') || '0')
+      };
+      const result = await createTabungan(tabunganData);
 
-      if (response.ok) {
-        console.log('✅ Tabungan created');
-        setShowAddDialog(false);
-        resetForm();
-        refreshTabungan();
-        onDataUpdate();
-        alert('Tabungan berhasil ditambah');
-      } else {
-        throw new Error('Gagal menambah tabungan');
-      }
+      setShowAddDialog(false);
+      setShowEditDialog(false);
+      setEditingTabungan(null);
+      resetForm();
+      
+      // Refresh parent data
+      await onDataUpdate();
+      
+      alert('Tabungan berhasil disimpan');
     } catch (error) {
-      console.error('Error adding tabungan:', error);
-      alert('Gagal menambah tabungan');
+      console.error('Error saving tabungan:', error);
+      alert('Gagal menyimpan tabungan');
     }
+  };
+
+  const handleEdit = (tabungan: Tabungan) => {
+    setEditingTabungan(tabungan);
+    setFormData({
+      nama: tabungan.nama,
+      saldoAwal: tabungan.saldoAwal.toString()
+    });
+    setShowEditDialog(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -154,7 +234,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
 
     try {
       console.log('🔄 Updating tabungan...');
-      const response = await fetch('/api/savings', {
+      const response = await fetch(`/api/savings/${editingTabungan.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -170,8 +250,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         console.log('✅ Tabungan updated');
         setShowEditDialog(false);
         resetAllForm();
-        refreshTabungan();
-        onDataUpdate();
+        await onDataUpdate();
         alert('Tabungan berhasil diupdate');
       } else {
         throw new Error('Gagal mengupdate tabungan');
@@ -180,15 +259,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
       console.error('Error updating tabungan:', error);
       alert('Gagal mengupdate tabungan');
     }
-  };
-
-  const handleEdit = (tabungan: Tabungan) => {
-    setEditingTabungan(tabungan);
-    setFormData({
-      nama: tabungan.nama,
-      saldoAwal: tabungan.saldoAwal.toString()
-    });
-    setShowEditDialog(true);
   };
 
   const handleDelete = async (id: number, nama: string) => {
@@ -201,8 +271,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
 
         if (response.ok) {
           console.log('✅ Tabungan deleted');
-          refreshTabungan();
-          onDataUpdate();
+          await onDataUpdate();
           alert('Tabungan berhasil dihapus');
         } else {
           throw new Error('Gagal menghapus tabungan');
@@ -226,12 +295,78 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
 
   const totalSaldoByKategori = Object.entries(tabunganByKategori).map(([kategori, items]) => ({
     kategori,
-    total: items.reduce((sum, t) => sum + t.jumlah, 0),
-    count: items.length
+    total: (items as Tabungan[]).reduce((sum, t) => sum + t.jumlah, 0),
+    count: (items as Tabungan[]).length
   }));
 
   return (
     <div className="space-y-6">
+      {/* NEW: Sync Status Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-center gap-3">
+          <Badge className={`${getSyncColor()} flex items-center gap-1`}>
+            {getSyncIcon()}
+            <span className="text-xs font-medium">
+              {syncStatus === 'synced' && 'Synced'}
+              {syncStatus === 'syncing' && 'Syncing...'}
+              {syncStatus === 'offline' && 'Offline'}
+              {syncStatus === 'error' && 'Sync Error'}
+            </span>
+          </Badge>
+          
+          <Badge className={`${getDataSourceColor()} flex items-center gap-1`}>
+            {getDataSourceIcon()}
+            <span className="text-xs font-medium">
+              {dataSource === 'server' && 'Server'}
+              {dataSource === 'local' && 'Local'}
+              {dataSource === 'mixed' && 'Mixed'}
+            </span>
+          </Badge>
+
+          <div className="flex items-center gap-1 text-xs text-gray-600">
+            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            Last sync: {formatLastSync(lastSync)}
+          </span>
+          
+          {!isOnline || syncStatus === 'error' ? (
+            <Button
+              onClick={handleForceSync}
+              disabled={isSyncing || !isOnline}
+              size="sm"
+              variant="outline"
+              className="h-8"
+            >
+              {isSyncing ? (
+                <RefreshCw className="w-3 h-3 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3 h-3" />
+              )}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* NEW: Offline Mode Alert */}
+      {!isOnline && (
+        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <WifiOff className="w-4 h-4 text-orange-600 mt-0.5" />
+            <div>
+              <h5 className="font-medium text-orange-800">Offline Mode</h5>
+              <p className="text-sm text-orange-700">
+                You're currently offline. You can view and manage tabungan, and changes will sync when you're back online.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Daftar Tabungan</h2>
@@ -247,8 +382,11 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Tambah Tabungan Baru</DialogTitle>
+              <DialogDescription>
+                Tambahkan rekening bank atau dompet digital baru untuk melacak saldo Anda
+              </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Nama Tabungan</label>
                 <Input
@@ -257,7 +395,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                   onChange={(e) => setFormData({...formData, nama: e.target.value})}
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500">
                   Kategori akan otomatis dideteksi dari nama (bank, e-wallet, e-money, cash)
                 </p>
               </div>
@@ -429,6 +567,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </div>
       ))}
 
+      {/* Empty State */}
       {tabungan.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
@@ -450,6 +589,9 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Tabungan</DialogTitle>
+            <DialogDescription>
+              Perbarui nama atau saldo awal tabungan yang sudah ada
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div>
@@ -460,7 +602,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                 onChange={(e) => setFormData({...formData, nama: e.target.value})}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500">
                 Ubah nama tabungan tidak akan mengubah kategori
               </p>
             </div>
@@ -477,7 +619,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
                   setFormData({...formData, saldoAwal: formatted});
                 }}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500">
                 Perubahan saldo awal akan menyesuaikan saldo saat ini
               </p>
             </div>

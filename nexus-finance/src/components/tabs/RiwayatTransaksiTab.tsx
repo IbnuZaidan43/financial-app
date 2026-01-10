@@ -17,8 +17,15 @@ import {
   Building,
   Smartphone,
   CreditCard,
-  Banknote
+  Banknote,
+  Wifi,
+  WifiOff,
+  Database,
+  Cloud,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
+import { useFinancial } from '@/lib/financial-context';
 
 // Interface yang sesuai dengan schema baru
 interface TransaksiData {
@@ -50,10 +57,84 @@ interface RiwayatTransaksiTabProps {
 }
 
 export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate }: RiwayatTransaksiTabProps) {
+  // NEW: Get financial context for sync status
+  const { 
+    isOnline, 
+    dataSource, 
+    syncStatus, 
+    lastSync, 
+    forceSync 
+  } = useFinancial();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTabungan, setFilterTabungan] = useState<string>('semua');
   const [filterJenis, setFilterJenis] = useState<string>('semua');
   const [filterBulan, setFilterBulan] = useState<string>('semua');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // NEW: Helper functions for sync status
+  const getSyncIcon = () => {
+    switch (syncStatus) {
+      case 'synced': return <Database className="w-4 h-4" />;
+      case 'syncing': return <RefreshCw className="w-4 h-4 animate-spin" />;
+      case 'offline': return <WifiOff className="w-4 h-4" />;
+      case 'error': return <AlertCircle className="w-4 h-4" />;
+      default: return <Database className="w-4 h-4" />;
+    }
+  };
+
+  const getSyncColor = () => {
+    switch (syncStatus) {
+      case 'synced': return 'bg-green-100 text-green-800 border-green-300';
+      case 'syncing': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'offline': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'error': return 'bg-red-100 text-red-800 border-red-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getDataSourceIcon = () => {
+    switch (dataSource) {
+      case 'server': return <Cloud className="w-4 h-4" />;
+      case 'local': return <Database className="w-4 h-4" />;
+      case 'mixed': return <Database className="w-4 h-4" />;
+      default: return <Database className="w-4 h-4" />;
+    }
+  };
+
+  const getDataSourceColor = () => {
+    switch (dataSource) {
+      case 'server': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'local': return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'mixed': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const formatLastSync = (date: Date | null) => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  // NEW: Handle manual sync
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    try {
+      await forceSync();
+      await onDataUpdate(); // Refresh parent data
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Generate bulan options
   const bulanOptions = [
@@ -182,6 +263,72 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
 
   return (
     <div className="space-y-6">
+      {/* NEW: Sync Status Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-center gap-3">
+          <Badge className={`${getSyncColor()} flex items-center gap-1`}>
+            {getSyncIcon()}
+            <span className="text-xs font-medium">
+              {syncStatus === 'synced' && 'Synced'}
+              {syncStatus === 'syncing' && 'Syncing...'}
+              {syncStatus === 'offline' && 'Offline'}
+              {syncStatus === 'error' && 'Sync Error'}
+            </span>
+          </Badge>
+          
+          <Badge className={`${getDataSourceColor()} flex items-center gap-1`}>
+            {getDataSourceIcon()}
+            <span className="text-xs font-medium">
+              {dataSource === 'server' && 'Server'}
+              {dataSource === 'local' && 'Local'}
+              {dataSource === 'mixed' && 'Mixed'}
+            </span>
+          </Badge>
+
+          <div className="flex items-center gap-1 text-xs text-gray-600">
+            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            Last sync: {formatLastSync(lastSync)}
+          </span>
+          
+          {!isOnline || syncStatus === 'error' ? (
+            <Button
+              onClick={handleForceSync}
+              disabled={isSyncing || !isOnline}
+              size="sm"
+              variant="outline"
+              className="h-8"
+            >
+              {isSyncing ? (
+                <RefreshCw className="w-3 h-3 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3 h-3" />
+              )}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* NEW: Offline Mode Alert */}
+      {!isOnline && (
+        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <WifiOff className="w-4 h-4 text-orange-600 mt-0.5" />
+            <div>
+              <h5 className="font-medium text-orange-800">Offline Mode</h5>
+              <p className="text-sm text-orange-700">
+                You're currently offline. You can view and manage transactions, and changes will sync when you're back online.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filter Section */}
       <Card>
         <CardHeader>
