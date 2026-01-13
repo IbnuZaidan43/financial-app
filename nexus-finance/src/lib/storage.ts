@@ -358,6 +358,12 @@ export const storage = {
 // Fallback to localStorage for browsers that don't support IndexedDB
 export const localStorageFallback = {
   saveData(userId: string, data: any): void {
+    // Check if running in browser environment
+    if (typeof window === 'undefined') {
+      console.warn('⚠️ localStorage not available in SSR environment');
+      return;
+    }
+
     try {
       const key = `keuangan_${userId}`;
       localStorage.setItem(key, JSON.stringify({
@@ -372,6 +378,12 @@ export const localStorageFallback = {
   },
 
   loadData(userId: string): any | null {
+    // Check if running in browser environment
+    if (typeof window === 'undefined') {
+      console.warn('⚠️ localStorage not available in SSR environment');
+      return null;
+    }
+
     try {
       const key = `keuangan_${userId}`;
       const data = localStorage.getItem(key);
@@ -388,6 +400,12 @@ export const localStorageFallback = {
   },
 
   deleteData(userId: string): void {
+    // Check if running in browser environment
+    if (typeof window === 'undefined') {
+      console.warn('⚠️ localStorage not available in SSR environment');
+      return;
+    }
+
     try {
       const key = `keuangan_${userId}`;
       localStorage.removeItem(key);
@@ -404,6 +422,15 @@ export const checkStorageSupport = (): {
   localStorage: boolean;
   recommended: 'indexedDB' | 'localStorage';
 } => {
+  // Check if running in browser environment
+  if (typeof window === 'undefined') {
+    return {
+      indexedDB: false,
+      localStorage: false,
+      recommended: 'localStorage' // Fallback for SSR
+    };
+  }
+  
   const indexedDB = 'indexedDB' in window;
   const localStorage = 'localStorage' in window;
   

@@ -86,6 +86,225 @@ let syncQueue = [];
 // Cache metadata storage
 let cacheMetadata = new Map();
 
+// Cache invalidation manager
+let cacheInvalidationManager = {
+  rules: new Map(),
+  eventListeners: new Map(),
+  versionHistory: new Map(),
+  invalidationStats: {
+    totalInvalidations: 0,
+    successfulInvalidations: 0,
+    failedInvalidations: 0,
+    lastInvalidation: null
+  },
+
+  // Initialize default invalidation rules
+  initializeRules() {
+    // API responses - 5 minutes TTL
+    this.addRule({
+      pattern: /^\/api\//,
+      config: {
+        maxAge: 5 * 60 * 1000, // 5 minutes
+        timeToLive: 10 * 60 * 1000, // 10 minutes
+        tags: ['api'],
+        invalidateOnEvents: ['user-logout', 'data-update']
+      },
+      priority: 1
+    });
+
+    // Financial data - 2 minutes TTL
+    this.addRule({
+      pattern: /^\/api\/(financial|keuangan|transaksi|saldo|tabungan)/,
+      config: {
+        maxAge: 2 * 60 * 1000, // 2 minutes
+        timeToLive: 5 * 60 * 1000, // 5 minutes
+        tags: ['financial', 'sensitive'],
+        invalidateOnEvents: ['user-logout', 'transaction-complete', 'balance-change']
+      },
+      priority: 10
+    });
+
+    // Static assets - 1 hour TTL
+    this.addRule({
+      pattern: /\.(js|css|png|jpg|jpeg|gif|webp|avif|woff|woff2|ttf|otf)$/i,
+      config: {
+        maxAge: 60 * 60 * 1000, // 1 hour
+        timeToLive: 24 * 60 * 60 * 1000, // 24 hours
+        tags: ['static'],
+        versionKey: 'asset-version'
+      },
+      priority: 5
+    });
+  },
+
+  // Add invalidation rule
+  addRule(rule) {
+    const ruleId = typeof rule.pattern === 'string' ? rule.pattern : rule.pattern.toString();
+    this.rules.set(ruleId, rule);
+  },
+
+  // Check if cache entry should be invalidated
+  shouldInvalidate(url, cacheType, metadata) {
+    const sortedRules = Array.from(this.rules.values())
+      .sort((a, b) => b.priority - a.priority);
+
+    for (const rule of sortedRules) {
+      if (this.matchesPattern(url, rule.pattern)) {
+        return this.evaluateRule(url, cacheType, rule.config, metadata);
+      }
+    }
+
+    return false;
+  },
+
+  // Check if URL matches pattern
+  matchesPattern(url, pattern) {
+    if (typeof pattern === 'string') {
+      return url.includes(pattern);
+    } else {
+      return pattern.test(url);
+    }
+  },
+
+  // Evaluate invalidation rule
+  evaluateRule(url, cacheType, config, metadata) {
+    const now = Date.now();
+
+    // Time-based invalidation
+    if (config.maxAge && metadata?.timestamp) {
+      if (now - metadata.timestamp > config.maxAge) {
+        return true;
+      }
+    }
+
+    if (config.timeToLive && metadata?.timestamp) {
+      if (now - metadata.timestamp > config.timeToLive) {
+        return true;
+      }
+    }
+
+    // Version-based invalidation
+    if (config.version && metadata?.version) {
+      if (metadata.version !== config.version) {
+        return true;
+      }
+    }
+
+    return false;
+  },
+
+  // Invalidate by pattern
+  async invalidateByPattern(pattern) {
+    const startTime = Date.now();
+    const result = {
+      success: true,
+      invalidatedKeys: [],
+      errors: [],
+      duration: 0
+    };
+
+    try {
+      const cacheNames = Object.values(CACHE_NAMES);
+      
+      for (const cacheName of cacheNames) {
+        const cache = await caches.open(cacheName);
+        const requests = await cache.keys();
+        
+        for (const request of requests) {
+          if (this.matchesPattern(request.url, pattern)) {
+            try {
+              await cache.delete(request);
+              result.invalidatedKeys.push(request.url);
+              cacheMetadata.delete(request.url);
+            } catch (error) {
+              result.errors.push(`Failed to invalidate ${request.url}: ${error}`);
+            }
+          }
+        }
+      }
+
+      this.invalidationStats.totalInvalidations++;
+      this.invalidationStats.successfulInvalidations++;
+      this.invalidationStats.lastInvalidation = new Date();
+
+    } catch (error) {
+      result.success = false;
+      result.errors.push(`Invalidation failed: ${error}`);
+      this.invalidationStats.failedInvalidations++;
+    }
+
+    result.duration = Date.now() - startTime;
+    
+    // Notify clients
+    notifyClients({
+      type: 'CACHE_INVALIDATION_COMPLETE',
+      result: result
+    });
+
+    return result;
+  },
+
+  // Invalidate by event
+  async invalidateByEvent(eventType, eventData) {
+    const startTime = Date.now();
+    const result = {
+      success: true,
+      invalidatedKeys: [],
+      errors: [],
+      duration: 0
+    };
+
+    try {
+      const event = {
+        type: eventType,
+        timestamp: Date.now(),
+        data: eventData,
+        source: 'service-worker'
+      };
+
+      // Find rules that listen for this event
+      const affectedRules = Array.from(this.rules.values())
+        .filter(rule => rule.config.invalidateOnEvents?.includes(eventType));
+
+      for (const rule of affectedRules) {
+        const patternResult = await this.invalidateByPattern(rule.pattern);
+        result.invalidatedKeys.push(...patternResult.invalidatedKeys);
+        result.errors.push(...patternResult.errors);
+      }
+
+      this.invalidationStats.totalInvalidations++;
+      this.invalidationStats.successfulInvalidations++;
+
+    } catch (error) {
+      result.success = false;
+      result.errors.push(`Event-based invalidation failed: ${error}`);
+      this.invalidationStats.failedInvalidations++;
+    }
+
+    result.duration = Date.now() - startTime;
+    
+    // Notify clients
+    notifyClients({
+      type: 'CACHE_INVALIDATION_COMPLETE',
+      result: result
+    });
+
+    return result;
+  },
+
+  // Get statistics
+  getStats() {
+    return {
+      ...this.invalidationStats,
+      rulesCount: this.rules.size,
+      eventListenersCount: this.eventListeners.size
+    };
+  }
+};
+
+// Initialize cache invalidation rules
+cacheInvalidationManager.initializeRules();
+
 // Enhanced Install Service Worker
 self.addEventListener('install', (event) => {
   console.log('🔧 SW: Installing service worker v' + CACHE_VERSION);
@@ -665,6 +884,12 @@ function isExpired(url, cacheType) {
   const metadata = cacheMetadata.get(url);
   if (!metadata) return true;
   
+  // Check cache invalidation rules first
+  if (cacheInvalidationManager.shouldInvalidate(url, cacheType, metadata)) {
+    console.log('🔧 SW: Cache entry invalidated by rules:', url);
+    return true;
+  }
+  
   const config = CACHE_CONFIG[cacheType];
   const age = Date.now() - metadata.timestamp;
   
@@ -798,6 +1023,33 @@ self.addEventListener('message', (event) => {
         event.ports[0].postMessage({ 
           type: 'CACHE_CLEANUP_COMPLETED' 
         });
+      });
+      break;
+      
+    // Cache invalidation commands
+    case 'INVALIDATE_CACHE_BY_PATTERN':
+      cacheInvalidationManager.invalidateByPattern(data.pattern).then(result => {
+        event.ports[0].postMessage({ 
+          type: 'CACHE_INVALIDATION_COMPLETE', 
+          result 
+        });
+      });
+      break;
+      
+    case 'INVALIDATE_CACHE_BY_EVENT':
+      cacheInvalidationManager.invalidateByEvent(data.eventType, data.eventData).then(result => {
+        event.ports[0].postMessage({ 
+          type: 'CACHE_INVALIDATION_COMPLETE', 
+          result 
+        });
+      });
+      break;
+      
+    case 'GET_CACHE_INVALIDATION_STATS':
+      const stats = cacheInvalidationManager.getStats();
+      event.ports[0].postMessage({ 
+        type: 'CACHE_INVALIDATION_STATS_RESPONSE', 
+        stats 
       });
       break;
       

@@ -32,7 +32,7 @@ export function useLocalStorage(options: UseLocalStorageOptions) {
     lastSync: null,
     isLoading: false,
     error: null,
-    isOnline: navigator.onLine,
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
     storageType: 'none'
   });
 
@@ -41,6 +41,9 @@ export function useLocalStorage(options: UseLocalStorageOptions) {
 
   // Update online status
   useEffect(() => {
+    // Only add event listeners in browser environment
+    if (typeof window === 'undefined') return;
+
     const handleOnline = () => setData(prev => ({ ...prev, isOnline: true }));
     const handleOffline = () => setData(prev => ({ ...prev, isOnline: false }));
 

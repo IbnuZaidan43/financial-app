@@ -5,6 +5,7 @@ import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAPI } from '@/hooks/use-enhanced-api';
 import { apiClient, type APIOptions, type APIResponse } from '@/lib/enhanced-api-client';
+import { useCacheInvalidation } from '@/hooks/use-cache-invalidation';
 
 // Interface untuk data dari API (mungkin berbeda dari Prisma types)
 interface TabunganData {
@@ -105,6 +106,20 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
   const [userId, setUserId] = useState<string>('default_user');
   
+  // Cache invalidation hooks
+  const { 
+    invalidateFinancial, 
+    invalidateUser, 
+    invalidateByEvent,
+    invalidateByPattern 
+  } = useCacheInvalidation({
+    autoInvalidate: true,
+    invalidateOnEvents: ['transaction-complete', 'balance-change', 'user-update'],
+    onInvalidationComplete: (result) => {
+      console.log('🔄 Cache invalidation completed:', result);
+    }
+  });
+  
   // NEW: Enhanced API hooks for caching (keep original state management)
   const tabunganAPI = useAPI<TabunganData[]>('/api/savings', {
     cacheStrategy: 'network-first',
@@ -173,6 +188,23 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       tabunganAPI.execute();
       transaksiAPI.execute();
       console.log('🚀 Enhanced API hooks enabled for userId:', userId);
+      
+      // Trigger cache invalidation for user login events
+      invalidateByEvent('user-login', { 
+        userId: userId,
+        timestamp: Date.now()
+      });
+    }
+  }, [userId]);
+
+  // NEW: Monitor user authentication changes
+  useEffect(() => {
+    // Monitor for user logout (when userId changes to default)
+    if (userId === 'default_user') {
+      invalidateByEvent('user-logout', { 
+        timestamp: Date.now(),
+        clearUserData: true
+      });
     }
   }, [userId]);
 
@@ -251,6 +283,14 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         try {
           await tabunganAPI.refetch();
           console.log('✅ Tabungan refreshed using enhanced API');
+          
+          // Trigger cache invalidation for data refresh events
+          invalidateByEvent('data-refreshed', { 
+            dataType: 'tabungan',
+            userId: userId,
+            source: 'enhanced-api'
+          });
+          
           return; // Success, exit early
         } catch (apiError) {
           console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
@@ -265,6 +305,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
           const data = await response.json();
           setTabungan(data);
           console.log('✅ Tabungan refreshed from server (original):', data, 'for user:', userId);
+          
+          // Trigger cache invalidation for data refresh events
+          invalidateByEvent('data-refreshed', { 
+            dataType: 'tabungan',
+            userId: userId,
+            source: 'original-api'
+          });
           
           // NEW: Save to local storage for offline access
           try {
@@ -300,6 +347,14 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         try {
           await transaksiAPI.refetch();
           console.log('✅ Transaksi refreshed using enhanced API');
+          
+          // Trigger cache invalidation for data refresh events
+          invalidateByEvent('data-refreshed', { 
+            dataType: 'transaksi',
+            userId: userId,
+            source: 'enhanced-api'
+          });
+          
           return; // Success, exit early
         } catch (apiError) {
           console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
@@ -314,6 +369,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
           const data = await response.json();
           setTransaksi(data);
           console.log('✅ Transaksi refreshed from server (original):', data, 'for user:', userId);
+          
+          // Trigger cache invalidation for data refresh events
+          invalidateByEvent('data-refreshed', { 
+            dataType: 'transaksi',
+            userId: userId,
+            source: 'original-api'
+          });
           
           // NEW: Save to local storage for offline access
           try {
@@ -361,6 +423,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.warn('⚠️ Failed to update balance in local storage:', error);
     }
+    
+    // Trigger cache invalidation for balance change events
+    invalidateByEvent('balance-change', { 
+      tabunganId: id, 
+      newBalance: newBalance,
+      userId: userId
+    });
     
     console.log('✅ Balance updated in context');
   };
@@ -474,6 +543,15 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       } else {
         // NEW: Return local data when offline
         console.log('📱 Tabungan created locally (offline mode)');
+        
+        // Trigger cache invalidation for tabungan creation events
+        invalidateByEvent('tabungan-created', { 
+          tabunganId: tempTabungan.id, 
+          nama: tempTabungan.nama,
+          saldoAwal: tempTabungan.saldoAwal,
+          offline: true
+        });
+        
         return tempTabungan;
       }
     } catch (error) {
@@ -599,6 +677,15 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       } else {
         // NEW: Return local data when offline
         console.log('📱 Transaksi created locally (offline mode)');
+        
+        // Trigger cache invalidation for transaction events
+        invalidateByEvent('transaction-complete', { 
+          transactionId: tempTransaksi.id, 
+          type: data.tipe,
+          amount: data.jumlah,
+          offline: true
+        });
+        
         return tempTransaksi;
       }
     } catch (error) {
@@ -625,6 +712,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       await refreshTransaksi();
       setSyncStatus('synced');
       console.log('✅ Force sync completed');
+      
+      // Trigger cache invalidation for force sync events
+      invalidateByEvent('force-sync-completed', { 
+        userId: userId,
+        timestamp: Date.now(),
+        syncedDataTypes: ['tabungan', 'transaksi']
+      });
     } catch (error) {
       console.error('❌ Force sync failed:', error);
       setSyncStatus('error');
