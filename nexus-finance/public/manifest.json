@@ -1,6 +1,6 @@
 {
-  "name": "Aplikasi Keuangan",
-  "short_name": "Keuangan",
+  "name": "Nexus Financial",
+  "short_name": "Financial",
   "description": "Aplikasi pengelolaan keuangan pribadi yang modern dan mudah digunakan",
   "start_url": "/",
   "display": "standalone",

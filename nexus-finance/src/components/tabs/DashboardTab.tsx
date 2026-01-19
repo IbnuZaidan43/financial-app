@@ -21,7 +21,8 @@ import {
   Database,
   Cloud,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -36,6 +37,7 @@ import {
 } from 'recharts';
 import type { Tabungan as PrismaTabungan, Transaksi as PrismaTransaksi } from '@prisma/client';
 import { useFinancial } from '@/lib/financial-context';
+import { usePWA } from '@/hooks/usePWA'; // NEW: Import usePWA hook
 
 interface TabunganInterface {
   id: number;
@@ -65,7 +67,7 @@ interface DashboardTabProps {
 }
 
 export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: DashboardTabProps) {
-  // NEW: Get financial context for sync status
+  // Get financial context for sync status
   const { 
     isOnline, 
     dataSource, 
@@ -74,13 +76,19 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
     forceSync 
   } = useFinancial();
   
+  // NEW: Get PWA context for install status
+  const {
+    canInstall, 
+    installPWA 
+  } = usePWA();
+  
   const [pemasukanBulanIni, setPemasukanBulanIni] = useState(0);
   const [pengeluaranBulanIni, setPengeluaranBulanIni] = useState(0);
   const [statistikBulanan, setStatistikBulanan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // NEW: Helper functions for sync status
+  // Helper functions for sync status
   const getSyncIcon = () => {
     switch (syncStatus) {
       case 'synced': return <Database className="w-4 h-4" />;
@@ -119,6 +127,18 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
     }
   };
 
+  // NEW: Helper function for PWA install status
+  const getPWAInstallIcon = () => {
+    return <Download className="w-4 h-4" />;
+  };
+
+  const getPWAInstallColor = () => {
+    // Gunakan canInstall untuk logika warna
+    return canInstall 
+      ? 'bg-green-100 text-green-800 border-green-300' 
+      : 'bg-gray-100 text-gray-800 border-gray-300';
+  };
+
   const formatLastSync = (date: Date | null) => {
     if (!date) return 'Never';
     const now = new Date();
@@ -131,7 +151,7 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  // NEW: Handle manual sync
+  // Handle manual sync
   const handleForceSync = async () => {
     setIsSyncing(true);
     try {
@@ -279,7 +299,7 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
 
   return (
     <div className="space-y-6">
-      {/* NEW: Sync Status Header */}
+      {/* Sync Status Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center gap-3">
           <Badge className={`${getSyncColor()} flex items-center gap-1`}>
@@ -298,6 +318,14 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
               {dataSource === 'server' && 'Server'}
               {dataSource === 'local' && 'Local'}
               {dataSource === 'mixed' && 'Mixed'}
+            </span>
+          </Badge>
+
+          {/* NEW: PWA Install Status */}
+          <Badge className={`${getPWAInstallColor()} flex items-center gap-1`}>
+            {getPWAInstallIcon()}
+            <span className="text-xs font-medium">
+              {canInstall ? 'Installable' : 'Not Installable'}
             </span>
           </Badge>
 
@@ -330,7 +358,7 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
         </div>
       </div>
 
-      {/* NEW: Offline Mode Alert */}
+      {/* Offline Mode Alert */}
       {!isOnline && (
         <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-start gap-2">
@@ -582,6 +610,37 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
           )}
         </CardContent>
       </Card>
+
+      {/* NEW: PWA Install Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="h-5 w-5" />
+            Install Aplikasi
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <p className="text-sm text-gray-600 mb-2">
+                {canInstall 
+                  ? "Aplikasi ini dapat diinstall sebagai aplikasi mandiri di perangkat Anda. Install untuk pengalaman yang lebih baik."
+                  : "Aplikasi ini tidak dapat diinstall saat ini. Pastikan Anda membuka dengan browser yang mendukung PWA."}
+              </p>
+            </div>
+            <Button
+              onClick={installPWA}
+              disabled={!canInstall}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              {canInstall ? "Install Aplikasi" : "Tidak Dapat Diinstall"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
+// perubahan

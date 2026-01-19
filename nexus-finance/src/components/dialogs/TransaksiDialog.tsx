@@ -19,6 +19,7 @@ import {
   CreditCard,
   Banknote
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TabunganData {
   id: number;
@@ -88,7 +89,6 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
 
   // Fungsi untuk filter tabungan berdasarkan tipe transaksi
   const getFilteredTabungan = () => {
-    // Tidak ada filter - semua tabungan bisa digunakan untuk pemasukan dan pengeluaran
     return tabungan;
   };
 
@@ -106,21 +106,18 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
     e.preventDefault();
     
     if (!formData.tipe || !formData.jumlah || !formData.tabunganId || !formData.tanggal) {
-      alert('Mohon lengkapi semua field yang wajib diisi');
+      toast.error('Mohon lengkapi semua field yang wajib diisi');
       return;
     }
 
     try {
       const selectedTabungan = tabungan.find(t => t.id!.toString() === formData.tabunganId);
       if (!selectedTabungan) {
-        alert('Tabungan tidak ditemukan');
+        toast.error('Tabungan tidak ditemukan');
         return;
       }
-
       console.log('📝 Creating transaction...');
       
-      // Create transaction dengan tabunganId yang benar
-      // API akan otomatis mengupdate balance tabungan
       const response = await fetch('/api/transactions?XTransformPort=3000', {
         method: 'POST',
         headers: {
@@ -145,11 +142,20 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
       const transaction = await response.json();
       console.log('✅ Transaction created:', transaction);
       
-      // Reset form dan tutup dialog
+       if (formData.tipe === 'pengeluaran') {
+        const amount = parseFloat(formData.jumlah.replace(/\./g, ''));
+        if (amount > 50000) {
+          toast.warning("Pengeluaran lebih dari Rp 50.000", {
+            description: "Pertimbangkan untuk berhemat ya! 💰",
+          });
+        }
+      }
+
+      toast.success("Transaksi berhasil disimpan!");
+
       resetForm();
       onOpenChange(false);
       
-      // Refresh data untuk update UI
       console.log('🔄 Refreshing data...');
       await refreshTransaksi();
       await refreshTabungan();
@@ -157,7 +163,7 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
       
     } catch (error) {
       console.error('❌ Error creating transaksi:', error);
-      alert('Gagal menyimpan transaksi: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Gagal menyimpan transaksi: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
