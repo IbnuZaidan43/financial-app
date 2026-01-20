@@ -59,8 +59,7 @@ interface RiwayatTransaksiTabProps {
 export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate }: RiwayatTransaksiTabProps) {
   // NEW: Get financial context for sync status
   const { 
-    isOnline, 
-    dataSource, 
+    isOnline,
     syncStatus, 
     lastSync, 
     forceSync 
@@ -89,24 +88,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
       case 'syncing': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'offline': return 'bg-orange-100 text-orange-800 border-orange-300';
       case 'error': return 'bg-red-100 text-red-800 border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getDataSourceIcon = () => {
-    switch (dataSource) {
-      case 'server': return <Cloud className="w-4 h-4" />;
-      case 'local': return <Database className="w-4 h-4" />;
-      case 'mixed': return <Database className="w-4 h-4" />;
-      default: return <Database className="w-4 h-4" />;
-    }
-  };
-
-  const getDataSourceColor = () => {
-    switch (dataSource) {
-      case 'server': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'local': return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'mixed': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
       default: return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
@@ -276,13 +257,9 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
             </span>
           </Badge>
           
-          <Badge className={`${getDataSourceColor()} flex items-center gap-1`}>
-            {getDataSourceIcon()}
-            <span className="text-xs font-medium">
-              {dataSource === 'server' && 'Server'}
-              {dataSource === 'local' && 'Local'}
-              {dataSource === 'mixed' && 'Mixed'}
-            </span>
+          <Badge className="bg-purple-100 text-purple-800 border-purple-300 flex items-center gap-1">
+            <Database className="w-4 h-4" />
+            <span className="text-xs font-medium">Local</span>
           </Badge>
 
           <div className="flex items-center gap-1 text-xs text-gray-600">

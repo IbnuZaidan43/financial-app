@@ -3,9 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useAPI } from '@/hooks/use-enhanced-api';
-import { apiClient, type APIOptions, type APIResponse } from '@/lib/enhanced-api-client';
-import { useCacheInvalidation } from '@/hooks/use-cache-invalidation';
+import * as XLSX from 'xlsx';
 
 // Interface untuk data dari API (mungkin berbeda dari Prisma types)
 interface TabunganData {
@@ -30,8 +28,8 @@ interface TransaksiData {
   updatedAt: string | Date;
 }
 
-// NEW: Data source types
-type DataSource = 'server' | 'local' | 'mixed';
+// Data source types (disederhanakan untuk local-first)
+type DataSource = 'local';
 
 interface FinancialContextType {
   tabungan: TabunganData[];
@@ -50,47 +48,26 @@ interface FinancialContextType {
     kategoriId?: number;
     tabunganId?: number;
   }) => Promise<any>;
-  // NEW: Local storage integration
+  // Local storage integration
   dataSource: DataSource;
   isOnline: boolean;
   lastSync: Date | null;
   syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   forceSync: () => Promise<void>;
+  exportData: (type: 'transactions' | 'savings') => Promise<void>;
+  importData: (file: File) => Promise<any>;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
 
-// Helper function untuk mendapatkan API URL berdasarkan environment
-const getApiUrl = (endpoint: string, userId?: string) => {
-  let url = endpoint;
-  
-  if (process.env.NODE_ENV === 'development') {
-    url += '?XTransformPort=3000';
-    
-    // ← NEW: Add userId to URL for GET requests
-    if (userId) {
-      url += `&userId=${userId}`;
-    }
-  } else {
-    // ← NEW: Add userId to URL for production
-    if (userId) {
-      url += `?userId=${userId}`;
-    }
-  }
-  
-  return url;
-};
-
-// ← NEW: Helper function untuk user management
+// Helper function untuk user management (tidak berubah)
 const getUserId = () => {
-  // Check if running in browser
   if (typeof window === 'undefined') {
-    return 'default_user'; // Server-side fallback
+    return 'default_user';
   }
   
   let userId = localStorage.getItem('financeUserId');
   if (!userId) {
-    // Generate unique user ID
     userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('financeUserId', userId);
     console.log('🆔 Generated new userId:', userId);
@@ -106,464 +83,122 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
   const [userId, setUserId] = useState<string>('default_user');
   
-  // Cache invalidation hooks
-  const { 
-    invalidateFinancial, 
-    invalidateUser, 
-    invalidateByEvent,
-    invalidateByPattern 
-  } = useCacheInvalidation({
-    autoInvalidate: true,
-    invalidateOnEvents: ['transaction-complete', 'balance-change', 'user-update'],
-    onInvalidationComplete: (result) => {
-      console.log('🔄 Cache invalidation completed:', result);
-    }
-  });
-  
-  // NEW: Enhanced API hooks for caching (keep original state management)
-  const tabunganAPI = useAPI<TabunganData[]>('/api/savings', {
-    cacheStrategy: 'network-first',
-    maxAge: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    enabled: false, // We'll enable manually after userId is set
-    onSuccess: (data: TabunganData[], response: APIResponse<TabunganData[]>) => {
-      // Update original state when API succeeds
-      setTabungan(data);
-      console.log('🚀 Enhanced API: Tabungan updated with cache');
-    },
-    onError: (error: string) => {
-      console.warn('⚠️ Enhanced API: Tabungan fetch failed, falling back to original logic');
-    }
-  });
-
-  const transaksiAPI = useAPI<TransaksiData[]>('/api/transactions', {
-    cacheStrategy: 'network-first', 
-    maxAge: 1 * 60 * 1000, // 1 minute
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    enabled: false, // We'll enable manually after userId is set
-    onSuccess: (data: TransaksiData[], response: APIResponse<TransaksiData[]>) => {
-      // Update original state when API succeeds
-      setTransaksi(data);
-      console.log('🚀 Enhanced API: Transaksi updated with cache');
-    },
-    onError: (error: string) => {
-      console.warn('⚠️ Enhanced API: Transaksi fetch failed, falling back to original logic');
-    }
-  });
-  
-  // NEW: Local storage integration
-  const [dataSource, setDataSource] = useState<DataSource>('server');
+  // State untuk sinkronisasi (disederhanakan)
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
-  const [isUsingLocalData, setIsUsingLocalData] = useState(false);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
 
-  // NEW: Initialize local storage hook
+  // Initialize local storage hook
   const {
     tabungan: localTabungan,
     transaksi: localTransaksi,
-    lastSync,
-    isOnline: isStorageOnline,
-    storageType,
+    isOnline,
     loadFromLocal,
     saveToLocal,
     updateData
   } = useLocalStorage({
-    userId: 'default_user', // Will be updated when userId is set
+    userId: 'default_user', // Akan diperbarui saat userId siap
     autoSave: true,
     autoLoad: true
   });
 
-  // ← NEW: Initialize userId on mount
+  // Initialize userId on mount
   useEffect(() => {
     const currentUserId = getUserId();
     setUserId(currentUserId);
     console.log('👤 FinancialProvider initialized with userId:', currentUserId);
   }, []);
 
-  // NEW: Enable enhanced API hooks when userId is ready
+  // Load initial data dari local storage saat userId siap
   useEffect(() => {
     if (userId !== 'default_user') {
-      // Enable enhanced API hooks
-      tabunganAPI.execute();
-      transaksiAPI.execute();
-      console.log('🚀 Enhanced API hooks enabled for userId:', userId);
-      
-      // Trigger cache invalidation for user login events
-      invalidateByEvent('user-login', { 
-        userId: userId,
-        timestamp: Date.now()
-      });
-    }
-  }, [userId]);
-
-  // NEW: Monitor user authentication changes
-  useEffect(() => {
-    // Monitor for user logout (when userId changes to default)
-    if (userId === 'default_user') {
-      invalidateByEvent('user-logout', { 
-        timestamp: Date.now(),
-        clearUserData: true
-      });
-    }
-  }, [userId]);
-
-  // NEW: Update local storage userId when it changes
-  useEffect(() => {
-    if (userId !== 'default_user') {
-      console.log('🔄 Updating local storage userId:', userId);
-      // Note: useLocalStorage hook doesn't support dynamic userId change
-      // This is a limitation we'll address in future iterations
-    }
-  }, [userId]);
-
-  // NEW: Determine data source based on online status and local data
-  const determineDataSource = (): DataSource => {
-    if (!isStorageOnline) {
-      return 'local';
-    }
-    
-    const hasLocalData = localTabungan.length > 0 || localTransaksi.length > 0;
-    const hasServerData = tabungan.length > 0 || transaksi.length > 0;
-    
-    if (hasLocalData && hasServerData) {
-      return 'mixed';
-    } else if (hasLocalData) {
-      return 'local';
-    } else {
-      return 'server';
-    }
-  };
-
-  // NEW: Update data source state
-  useEffect(() => {
-    const newDataSource = determineDataSource();
-    setDataSource(newDataSource);
-    
-    // Update sync status based on online status
-    if (!isStorageOnline) {
-      setSyncStatus('offline');
-    } else if (lastSync && new Date().getTime() - lastSync.getTime() < 60000) {
-      setSyncStatus('synced');
-    } else {
-      setSyncStatus('syncing');
-    }
-  }, [isStorageOnline, localTabungan, localTransaksi, tabungan, transaksi, lastSync]);
-
-  // NEW: Merge server and local data
-  const getMergedData = () => {
-    const serverTabungan = tabungan;
-    const serverTransaksi = transaksi;
-    const localTabunganData = localTabungan;
-    const localTransaksiData = localTransaksi;
-
-    // For now, prioritize server data when online, local data when offline
-    if (isStorageOnline) {
-      return {
-        tabungan: serverTabungan.length > 0 ? serverTabungan : localTabunganData,
-        transaksi: serverTransaksi.length > 0 ? serverTransaksi : localTransaksiData
-      };
-    } else {
-      return {
-        tabungan: localTabunganData,
-        transaksi: localTransaksiData
-      };
-    }
-  };
-
-  // NEW: Get current data (merged)
-  const currentData = getMergedData();
-
-  const refreshTabungan = async () => {
-    try {
-      console.log('🔄 Refreshing tabungan for userId:', userId);
-      
-      // ENHANCED: Try enhanced API first, fallback to original logic
-      if (userId !== 'default_user') {
-        try {
-          await tabunganAPI.refetch();
-          console.log('✅ Tabungan refreshed using enhanced API');
-          
-          // Trigger cache invalidation for data refresh events
-          invalidateByEvent('data-refreshed', { 
-            dataType: 'tabungan',
-            userId: userId,
-            source: 'enhanced-api'
-          });
-          
-          return; // Success, exit early
-        } catch (apiError) {
-          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
-        }
-      }
-      
-      // ORIGINAL LOGIC: Fallback to original fetch implementation
-      if (isStorageOnline) {
-        const response = await fetch(getApiUrl('/api/savings', userId));
-        
-        if (response.ok) {
-          const data = await response.json();
-          setTabungan(data);
-          console.log('✅ Tabungan refreshed from server (original):', data, 'for user:', userId);
-          
-          // Trigger cache invalidation for data refresh events
-          invalidateByEvent('data-refreshed', { 
-            dataType: 'tabungan',
-            userId: userId,
-            source: 'original-api'
-          });
-          
-          // NEW: Save to local storage for offline access
-          try {
-            await saveToLocal(data, localTransaksi);
-            console.log('💾 Tabungan saved to local storage');
-          } catch (saveError) {
-            console.warn('⚠️ Failed to save tabungan to local storage:', saveError);
-          }
-        } else {
-          throw new Error(`Failed to fetch savings: ${response.status}`);
-        }
-      } else {
-        // NEW: Use local data when offline
-        console.log('📱 Using local tabungan data (offline mode)');
+      console.log('🚀 FinancialProvider mounted, loading initial data for userId:', userId);
+      loadFromLocal().then(() => {
+        console.log('📱 Local data loaded');
+        // Update state dengan data dari local storage
         setTabungan(localTabungan);
-      }
-    } catch (error) {
-      console.error('Error refreshing tabungan:', error);
-      
-      // NEW: Fallback to local data on error
-      console.log('📱 Falling back to local tabungan data');
+        setTransaksi(localTransaksi);
+        setLastSync(new Date()); // Set last sync saat data dimuat
+      });
+    }
+  }, [userId]);
+
+  // Fungsi refresh hanya mengambil data dari local storage
+  const refreshTabungan = async () => {
+    console.log('🔄 Refreshing tabungan from local storage...');
+    try {
+      await loadFromLocal();
       setTabungan(localTabungan);
+      console.log('✅ Tabungan loaded from local storage');
+    } catch (error) {
+      console.error('Error loading tabungan from local storage:', error);
       setSyncStatus('error');
     }
   };
 
   const refreshTransaksi = async () => {
+    console.log('🔄 Refreshing transaksi from local storage...');
     try {
-      console.log('🔄 Refreshing transaksi for userId:', userId);
-      
-      // ENHANCED: Try enhanced API first, fallback to original logic
-      if (userId !== 'default_user') {
-        try {
-          await transaksiAPI.refetch();
-          console.log('✅ Transaksi refreshed using enhanced API');
-          
-          // Trigger cache invalidation for data refresh events
-          invalidateByEvent('data-refreshed', { 
-            dataType: 'transaksi',
-            userId: userId,
-            source: 'enhanced-api'
-          });
-          
-          return; // Success, exit early
-        } catch (apiError) {
-          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
-        }
-      }
-      
-      // ORIGINAL LOGIC: Fallback to original fetch implementation
-      if (isStorageOnline) {
-        const response = await fetch(getApiUrl('/api/transactions', userId));
-        
-        if (response.ok) {
-          const data = await response.json();
-          setTransaksi(data);
-          console.log('✅ Transaksi refreshed from server (original):', data, 'for user:', userId);
-          
-          // Trigger cache invalidation for data refresh events
-          invalidateByEvent('data-refreshed', { 
-            dataType: 'transaksi',
-            userId: userId,
-            source: 'original-api'
-          });
-          
-          // NEW: Save to local storage for offline access
-          try {
-            await saveToLocal(localTabungan, data);
-            console.log('💾 Transaksi saved to local storage');
-          } catch (saveError) {
-            console.warn('⚠️ Failed to save transaksi to local storage:', saveError);
-          }
-        } else {
-          throw new Error(`Failed to fetch transactions: ${response.status}`);
-        }
-      } else {
-        // NEW: Use local data when offline
-        console.log('📱 Using local transaksi data (offline mode)');
-        setTransaksi(localTransaksi);
-      }
-    } catch (error) {
-      console.error('Error refreshing transaksi:', error);
-      
-      // NEW: Fallback to local data on error
-      console.log('📱 Falling back to local transaksi data');
+      await loadFromLocal();
       setTransaksi(localTransaksi);
+      console.log('✅ Transaksi loaded from local storage');
+    } catch (error) {
+      console.error('Error loading transaksi from local storage:', error);
       setSyncStatus('error');
     }
   };
 
+  // Update balance langsung di state dan local storage
   const updateTabunganBalance = (id: number, newBalance: number) => {
     console.log('🔄 Updating balance in context:', { id, newBalance, userId });
     
-    // Update server state
-    setTabungan(prev => 
-      prev.map(t => 
-        t.id === id ? { ...t, jumlah: newBalance } : t
-      )
+    const updatedTabungan = tabungan.map(t => 
+      t.id === id ? { ...t, jumlah: newBalance, updatedAt: new Date() } : t
     );
     
-    // NEW: Update local storage immediately
-    const updatedTabungan = tabungan.map(t => 
-      t.id === id ? { ...t, jumlah: newBalance } : t
-    );
+    setTabungan(updatedTabungan);
     
     try {
       updateData(updatedTabungan, transaksi);
+      setLastSync(new Date());
       console.log('💾 Balance updated in local storage');
     } catch (error) {
       console.warn('⚠️ Failed to update balance in local storage:', error);
     }
     
-    // Trigger cache invalidation for balance change events
-    invalidateByEvent('balance-change', { 
-      tabunganId: id, 
-      newBalance: newBalance,
-      userId: userId
-    });
-    
     console.log('✅ Balance updated in context');
   };
 
-  // ← NEW: Enhanced initial load with userId dependency
-  useEffect(() => {
-    if (userId !== 'default_user') {
-      console.log('🚀 FinancialProvider mounted, loading initial data for userId:', userId);
-      
-      // NEW: Load from local storage first for instant UI
-      loadFromLocal().then(() => {
-        console.log('📱 Local data loaded, refreshing from server...');
-      });
-      
-      // Then refresh from server (enhanced API will handle this)
-      refreshTabungan();
-      refreshTransaksi();
-    }
-  }, [userId]); // ← Changed dependency from [] to [userId]
-
-  // ← NEW: Method to create savings with enhanced API and original fallback
+  // Create tabungan langsung di state dan local storage
   const createTabungan = async (data: { nama: string; saldoAwal: number }) => {
+    console.log('💾 Creating tabungan locally:', data);
+    
+    const newTabungan: TabunganData = {
+      id: Date.now(), // Gunakan timestamp sebagai ID
+      nama: data.nama,
+      saldoAwal: data.saldoAwal,
+      jumlah: data.saldoAwal,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const updatedTabungan = [...tabungan, newTabungan];
+    setTabungan(updatedTabungan);
+    
     try {
-      console.log('💾 Creating tabungan for userId:', userId, data);
-      
-      // NEW: Save to local storage immediately for offline support
-      const tempTabungan = {
-        id: Date.now(), // Temporary ID
-        nama: data.nama,
-        saldoAwal: data.saldoAwal,
-        jumlah: data.saldoAwal,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      // Update local state immediately
-      setTabungan(prev => [...prev, tempTabungan]);
-      
-      try {
-        updateData([...tabungan, tempTabungan], transaksi);
-        console.log('💾 Tabungan saved to local storage immediately');
-      } catch (saveError) {
-        console.warn('⚠️ Failed to save tabungan to local storage:', saveError);
-      }
-      
-      // ENHANCED: Try enhanced API client first
-      if (userId !== 'default_user') {
-        try {
-          const response = await apiClient.post('/api/savings', {
-            ...data,
-            userId: userId
-          }, {
-            cacheStrategy: 'network-only', // Don't cache POST requests
-            retryCount: 3,
-            retryDelay: 1000
-          });
-
-          if (response.fromCache === false) {
-            console.log('✅ Tabungan created using enhanced API:', response.data);
-            
-            // Replace temporary data with server data
-            setTabungan(prev => prev.map(t => t.id === tempTabungan.id ? response.data : t));
-            
-            // Update local storage with server data
-            try {
-              updateData(tabungan.map(t => t.id === tempTabungan.id ? response.data : t), transaksi);
-              console.log('💾 Local storage updated with server data');
-            } catch (saveError) {
-              console.warn('⚠️ Failed to update local storage:', saveError);
-            }
-            
-            return response.data;
-          }
-        } catch (apiError) {
-          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
-        }
-      }
-      
-      // ORIGINAL LOGIC: Fallback to original fetch implementation
-      if (isStorageOnline) {
-        const response = await fetch(getApiUrl('/api/savings'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...data,
-            userId: userId
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('✅ Tabungan created on server (original):', result);
-          
-          // Replace temporary data with server data
-          setTabungan(prev => prev.map(t => t.id === tempTabungan.id ? result : t));
-          
-          // Update local storage with server data
-          try {
-            updateData(tabungan.map(t => t.id === tempTabungan.id ? result : t), transaksi);
-            console.log('💾 Local storage updated with server data');
-          } catch (saveError) {
-            console.warn('⚠️ Failed to update local storage:', saveError);
-          }
-          
-          return result;
-        } else {
-          throw new Error(`Failed to create savings: ${response.status}`);
-        }
-      } else {
-        // NEW: Return local data when offline
-        console.log('📱 Tabungan created locally (offline mode)');
-        
-        // Trigger cache invalidation for tabungan creation events
-        invalidateByEvent('tabungan-created', { 
-          tabunganId: tempTabungan.id, 
-          nama: tempTabungan.nama,
-          saldoAwal: tempTabungan.saldoAwal,
-          offline: true
-        });
-        
-        return tempTabungan;
-      }
+      await updateData(updatedTabungan, transaksi);
+      setLastSync(new Date());
+      console.log('✅ Tabungan created and saved locally');
     } catch (error) {
-      console.error('Error creating tabungan:', error);
-      
-      // NEW: Revert local state on error
-      setTabungan(prev => prev.filter(t => t.id !== Date.now()));
+      // Revert state jika gagal menyimpan
+      setTabungan(tabungan);
+      console.error('❌ Failed to save tabungan:', error);
       throw error;
     }
+    
+    return newTabungan;
   };
 
-  // ← NEW: Method to create transaction with enhanced API and original fallback
+  // Create transaksi langsung di state dan local storage
   const createTransaksi = async (data: {
     judul: string;
     jumlah: number;
@@ -573,176 +208,199 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     kategoriId?: number;
     tabunganId?: number;
   }) => {
-    try {
-      console.log('💾 Creating transaction for userId:', userId, data);
-      
-      // NEW: Save to local storage immediately for offline support
-      const tempTransaksi = {
-        id: Date.now(), // Temporary ID
-        judul: data.judul,
-        jumlah: data.jumlah,
-        deskripsi: data.deskripsi || null,
-        tanggal: data.tanggal,
-        tipe: data.tipe,
-        kategoriId: data.kategoriId || null,
-        tabunganId: data.tabunganId || null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      // Update local state immediately
-      setTransaksi(prev => [tempTransaksi, ...prev]);
-      
-      try {
-        updateData(tabungan, [tempTransaksi, ...transaksi]);
-        console.log('💾 Transaksi saved to local storage immediately');
-      } catch (saveError) {
-        console.warn('⚠️ Failed to save transaksi to local storage:', saveError);
-      }
-      
-      // ENHANCED: Try enhanced API client first
-      if (userId !== 'default_user') {
-        try {
-          const response = await apiClient.post('/api/transactions', {
-            ...data,
-            userId: userId
-          }, {
-            cacheStrategy: 'network-only', // Don't cache POST requests
-            retryCount: 3,
-            retryDelay: 1000
-          });
-
-          if (response.fromCache === false) {
-            console.log('✅ Transaction created using enhanced API:', response.data);
-            
-            // Replace temporary data with server data
-            setTransaksi(prev => prev.map(t => t.id === tempTransaksi.id ? response.data : t));
-            
-            // Update local storage with server data
-            try {
-              updateData(
-                tabungan, 
-                transaksi.map(t => t.id === tempTransaksi.id ? response.data : t)
-              );
-              console.log('💾 Local storage updated with server data');
-            } catch (saveError) {
-              console.warn('⚠️ Failed to update local storage:', saveError);
-            }
-            
-            // Refresh tabungan to update balances
-            await refreshTabungan();
-            
-            return response.data;
-          }
-        } catch (apiError) {
-          console.warn('⚠️ Enhanced API failed, using original logic:', apiError);
-        }
-      }
-      
-      // ORIGINAL LOGIC: Fallback to original fetch implementation
-      if (isStorageOnline) {
-        const response = await fetch(getApiUrl('/api/transactions'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...data,
-            userId: userId
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('✅ Transaction created on server (original):', result);
-          
-          // Replace temporary data with server data
-          setTransaksi(prev => prev.map(t => t.id === tempTransaksi.id ? result : t));
-          
-          // Update local storage with server data
-          try {
-            updateData(tabungan, transaksi.map(t => t.id === tempTransaksi.id ? result : t));
-            console.log('💾 Local storage updated with server data');
-          } catch (saveError) {
-            console.warn('⚠️ Failed to update local storage:', saveError);
-          }
-          
-          // Refresh tabungan to update balances
-          await refreshTabungan();
-          
-          return result;
-        } else {
-          throw new Error(`Failed to create transaction: ${response.status}`);
-        }
-      } else {
-        // NEW: Return local data when offline
-        console.log('📱 Transaksi created locally (offline mode)');
+    console.log('💾 Creating transaction locally:', data);
+    
+    const newTransaksi: TransaksiData = {
+      id: Date.now(),
+      judul: data.judul,
+      jumlah: data.jumlah,
+      deskripsi: data.deskripsi || null,
+      tanggal: data.tanggal,
+      tipe: data.tipe,
+      kategoriId: data.kategoriId || null,
+      tabunganId: data.tabunganId || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const updatedTransaksi = [newTransaksi, ...transaksi];
+    setTransaksi(updatedTransaksi);
+    
+    // Update saldo tabungan jika ada tabunganId
+    let updatedTabungan = tabungan;
+    if (data.tabunganId) {
+      const currentTabungan = tabungan.find(t => t.id === data.tabunganId);
+      if (currentTabungan) {
+        const newBalance = data.tipe === 'pengeluaran' 
+          ? currentTabungan.jumlah - data.jumlah 
+          : currentTabungan.jumlah + data.jumlah;
         
-        // Trigger cache invalidation for transaction events
-        invalidateByEvent('transaction-complete', { 
-          transactionId: tempTransaksi.id, 
-          type: data.tipe,
-          amount: data.jumlah,
-          offline: true
-        });
-        
-        return tempTransaksi;
+        updatedTabungan = tabungan.map(t => 
+          t.id === data.tabunganId 
+            ? { ...t, jumlah: newBalance, updatedAt: new Date() } 
+            : t
+        );
+        setTabungan(updatedTabungan);
       }
-    } catch (error) {
-      console.error('Error creating transaction:', error);
-      
-      // NEW: Revert local state on error
-      setTransaksi(prev => prev.filter(t => t.id !== Date.now()));
-      throw error;
-    }
-  };
-
-  // NEW: Force sync method
-  const forceSync = async () => {
-    if (!isStorageOnline) {
-      console.log('📱 Cannot sync while offline');
-      return;
     }
     
+    try {
+      await updateData(updatedTabungan, updatedTransaksi);
+      setLastSync(new Date());
+      console.log('✅ Transaction created and saved locally');
+    } catch (error) {
+      // Revert state jika gagal menyimpan
+      setTransaksi(transaksi);
+      if (data.tabunganId) {
+        setTabungan(tabungan);
+      }
+      console.error('❌ Failed to save transaction:', error);
+      throw error;
+    }
+    
+    return newTransaksi;
+  };
+
+  // Force sync hanya me-refresh data dari local storage
+  const forceSync = async () => {
+    console.log('🔄 "Syncing" is just refreshing local data...');
     setSyncStatus('syncing');
-    console.log('🔄 Force syncing data...');
     
     try {
       await refreshTabungan();
       await refreshTransaksi();
       setSyncStatus('synced');
-      console.log('✅ Force sync completed');
-      
-      // Trigger cache invalidation for force sync events
-      invalidateByEvent('force-sync-completed', { 
-        userId: userId,
-        timestamp: Date.now(),
-        syncedDataTypes: ['tabungan', 'transaksi']
-      });
+      setLastSync(new Date());
+      console.log('✅ Local data refreshed');
     } catch (error) {
-      console.error('❌ Force sync failed:', error);
+      console.error('❌ Failed to refresh local data:', error);
       setSyncStatus('error');
-      throw error;
     }
   };
 
+  const exportData = async (type: 'transactions' | 'savings') => {
+  try {
+    let worksheet: XLSX.WorkSheet;
+    let fileName: string;
+
+    if (type === 'transactions') {
+      // Siapkan data untuk transaksi
+      const dataForExcel = transaksi.map(t => ({
+        Tanggal: t.tanggal,
+        Judul: t.judul,
+        Keterangan: t.deskripsi || '',
+        Jumlah: t.jumlah,
+        Tipe: t.tipe,
+        Tabungan: tabungan.find(tab => tab.id === t.tabunganId)?.nama || 'Tidak diketahui'
+      }));
+      worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+      fileName = `Laporan_Keuangan_${new Date().toISOString().split('T')[0]}.xlsx`;
+    } else {
+      // Siapkan data untuk tabungan
+      const dataForExcel = tabungan.map(t => ({
+        Nama: t.nama,
+        Saldo: t.jumlah,
+        'Dibuat Tanggal': new Date(t.createdAt).toLocaleDateString('id-ID')
+      }));
+      worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+      fileName = `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.xlsx`;
+    }
+
+    // Buat workbook dan tambahkan worksheet
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, type === 'transactions' ? 'Transaksi' : 'Tabungan');
+
+    // Konversi workbook ke buffer lalu trigger download
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    console.log(`✅ ${type} exported successfully`);
+  } catch (error) {
+    console.error(`❌ Failed to export ${type}:`, error);
+    throw error;
+  }
+};
+
+// Fungsi untuk import dari Excel
+const importData = async (file: File) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        
+        // Asumsikan kita mengimpor dari sheet pertama
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        // Validasi dan proses data yang diimpor
+        const importedTransactions: any[] = [];
+        for (const row of jsonData as any[]) {
+          // Sesuaikan dengan kolom di Excel kamu
+          if (row.Tanggal && row.Jumlah && row.Tipe) {
+            const newTransaction = {
+              id: Date.now() + Math.random(), // ID sementara
+              judul: row.Judul || 'Transaksi Import',
+              jumlah: parseFloat(row.Jumlah),
+              deskripsi: row.Keterangan || null,
+              tanggal: new Date(row.Tanggal).toISOString().split('T')[0],
+              tipe: row.Tipe,
+              tabunganId: tabungan.find(t => t.nama === row.Tabungan)?.id || null,
+              kategoriId: null,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+            importedTransactions.push(newTransaction);
+          }
+        }
+
+        // Update state dan local storage
+        const updatedTransaksi = [...importedTransactions, ...transaksi];
+        setTransaksi(updatedTransaksi);
+        await updateData(tabungan, updatedTransaksi);
+        setLastSync(new Date());
+
+        console.log(`✅ ${importedTransactions.length} transactions imported successfully`);
+        resolve(importedTransactions);
+      } catch (error) {
+        console.error('❌ Failed to import data:', error);
+        reject(error);
+      }
+    };
+    reader.onerror = () => reject(new Error('Gagal membaca file'));
+    reader.readAsBinaryString(file);
+  });
+};
+
   return (
     <FinancialContext.Provider value={{
-      // Use merged data for better UX
-      tabungan: currentData.tabungan,
-      transaksi: currentData.transaksi,
+      tabungan,
+      transaksi,
       refreshTabungan,
       refreshTransaksi,
       updateTabunganBalance,
       userId,
       createTabungan,
       createTransaksi,
-      // NEW: Local storage integration
-      dataSource,
-      isOnline: isStorageOnline,
+      // Local storage integration
+      dataSource: 'local', // Selalu 'local'
+      isOnline,
       lastSync,
       syncStatus,
-      forceSync
+      forceSync,
+      exportData,
+      importData
     }}>
       {children}
     </FinancialContext.Provider>

@@ -37,7 +37,6 @@ import {
 } from 'recharts';
 import type { Tabungan as PrismaTabungan, Transaksi as PrismaTransaksi } from '@prisma/client';
 import { useFinancial } from '@/lib/financial-context';
-import { usePWA } from '@/hooks/usePWA'; // NEW: Import usePWA hook
 
 interface TabunganInterface {
   id: number;
@@ -64,23 +63,18 @@ interface DashboardTabProps {
   tabungan: TabunganInterface[];
   transaksi: TransaksiInterface[];
   onDataUpdate: () => void;
+  canInstall: boolean;
+  installPWA: () => void;
 }
 
-export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: DashboardTabProps) {
+export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canInstall, installPWA }: DashboardTabProps) {
   // Get financial context for sync status
   const { 
-    isOnline, 
-    dataSource, 
+    isOnline,
     syncStatus, 
     lastSync, 
     forceSync 
   } = useFinancial();
-  
-  // NEW: Get PWA context for install status
-  const {
-    canInstall, 
-    installPWA 
-  } = usePWA();
   
   const [pemasukanBulanIni, setPemasukanBulanIni] = useState(0);
   const [pengeluaranBulanIni, setPengeluaranBulanIni] = useState(0);
@@ -105,24 +99,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
       case 'syncing': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'offline': return 'bg-orange-100 text-orange-800 border-orange-300';
       case 'error': return 'bg-red-100 text-red-800 border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getDataSourceIcon = () => {
-    switch (dataSource) {
-      case 'server': return <Cloud className="w-4 h-4" />;
-      case 'local': return <Database className="w-4 h-4" />;
-      case 'mixed': return <Database className="w-4 h-4" />;
-      default: return <Database className="w-4 h-4" />;
-    }
-  };
-
-  const getDataSourceColor = () => {
-    switch (dataSource) {
-      case 'server': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'local': return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'mixed': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
       default: return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
@@ -312,18 +288,22 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate }: Dash
             </span>
           </Badge>
           
-          <Badge className={`${getDataSourceColor()} flex items-center gap-1`}>
-            {getDataSourceIcon()}
-            <span className="text-xs font-medium">
-              {dataSource === 'server' && 'Server'}
-              {dataSource === 'local' && 'Local'}
-              {dataSource === 'mixed' && 'Mixed'}
-            </span>
+          <Badge className="bg-purple-100 text-purple-800 border-purple-300 flex items-center gap-1">
+            <Database className="w-4 h-4" />
+            <span className="text-xs font-medium">Local</span>
           </Badge>
 
           {/* NEW: PWA Install Status */}
-          <Badge className={`${getPWAInstallColor()} flex items-center gap-1`}>
+          {/* <Badge className={`${getPWAInstallColor()} flex items-center gap-1`}>
             {getPWAInstallIcon()}
+            <span className="text-xs font-medium">
+              {canInstall ? 'Installable' : 'Not Installable'}
+            </span>
+          </Badge> */}
+
+          {/* PERBAIKAN: PWA Install Status */}
+          <Badge className={`${canInstall ? 'bg-green-100 text-green-800 border-green-300' : 'bg-gray-100 text-gray-800 border-gray-300'} flex items-center gap-1`}>
+            <Download className="w-4 h-4" />
             <span className="text-xs font-medium">
               {canInstall ? 'Installable' : 'Not Installable'}
             </span>

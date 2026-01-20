@@ -22,8 +22,7 @@ import RiwayatTransaksiTab from '@/components/tabs/RiwayatTransaksiTab';
 import TabunganTab from '@/components/tabs/TabunganTab';
 import FileTab from '@/components/tabs/FileTab';
 import TransaksiDialog from '@/components/dialogs/TransaksiDialog';
-
-import SimplePWATest from '@/components/SimplePWATest';
+import { usePWA } from '@/hooks/usePWA'
 
 export default function KeuanganPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -31,7 +30,7 @@ export default function KeuanganPage() {
   
   // Gunakan financial context
   const { tabungan, transaksi, refreshTabungan, refreshTransaksi } = useFinancial();
-
+  const { canInstall, installPWA } = usePWA();
   const totalSaldo = tabungan.reduce((total, t) => total + t.jumlah, 0);
 
   const loadData = () => {
@@ -103,6 +102,8 @@ export default function KeuanganPage() {
               tabungan={tabungan} 
               transaksi={transaksi}
               onDataUpdate={loadData}
+              canInstall={canInstall}
+              installPWA={installPWA}
             />
           </TabsContent>
 

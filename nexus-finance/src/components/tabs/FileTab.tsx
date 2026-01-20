@@ -1,86 +1,61 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Download, Upload, Database,FileSpreadsheet,Settings } from 'lucide-react';
+import { Download, Upload, Database, FileSpreadsheet, Settings } from 'lucide-react';
 import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { ImportDialog } from '@/components/dialogs/ImportDialog';
-import { useTransactions, useSavings } from '@/hooks/use-api';
+import { useFinancial } from '@/lib/financial-context'; // <-- 1. GANTI INI
+import { toast } from 'sonner'; // <-- Tambahkan notifikasi
 
 export default function FileTab() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
 
-  const { transactions, refetch: refetchTransactions } = useTransactions();
-  const { savings, refetch: refetchSavings } = useSavings();
+  // 2. GANTI HOOK SERVER DENGAN HOOK LOKAL
+  const { 
+    tabungan, // Ganti 'savings' menjadi 'tabungan'
+    transaksi, 
+    exportData, // Ambil fungsi export dari context
+    importData  // Ambil fungsi import dari context
+  } = useFinancial();
 
-  const handleExport = async (type: string) => {
+  // 3. PERBAIKI FUNGSI EXPORT
+  const handleExport = async (type: 'transactions' | 'savings') => {
     try {
-      let endpoint = '';
-      
-      if (type === 'transactions') {
-        endpoint = '/api/export/transactions';
-      } else if (type === 'savings') {
-        endpoint = '/api/export/savings';
-      } else {
-        endpoint = '/api/export/transactions';
-      }
-      
-      const response = await fetch(endpoint);
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        const filename = type === 'savings' 
-          ? `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.csv`
-          : `Laporan_Keuangan_${new Date().toISOString().split('T')[0]}.csv`;
-        
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        throw new Error('Export failed');
-      }
+      await exportData(type);
+      toast.success(`Data ${type === 'savings' ? 'Tabungan' : 'Transaksi'} berhasil di-export!`);
     } catch (error) {
       console.error('Export failed:', error);
-      throw error;
+      toast.error('Export gagal. Silakan coba lagi.');
     }
   };
 
-  const handleImportComplete = () => {
-    Promise.all([
-      refetchTransactions(),
-      refetchSavings()
-    ]);
+  // 4. BUAT FUNGSI BARU UNTUK IMPORT
+  const handleImport = async (file: File) => {
+    try {
+      await importData(file);
+      toast.success('Data berhasil di-import!');
+      setShowImportDialog(false); // Tutup dialog setelah berhasil
+    } catch (error) {
+      console.error('Import failed:', error);
+      toast.error('Import gagal. Periksa format file kamu.');
+    }
   };
 
-  useEffect(() => {
-    const handleImportCompleteEvent = () => {
-      Promise.all([
-        refetchTransactions(),
-        refetchSavings()
-      ]);
-    };
+  // 5. HAPUS FUNGSI DAN useEffect YANG TIDAK PERLU
+  // - handleImportComplete (dihapus)
+  // - useEffect untuk 'import-complete' (dihapus)
 
-    window.addEventListener('import-complete', handleImportCompleteEvent);
-    
-    return () => {
-      window.removeEventListener('import-complete', handleImportCompleteEvent);
-    };
-  }, [refetchTransactions, refetchSavings]);
-
-  const totalSaldo = savings.reduce((total, s) => total + s.jumlah, 0);
-  const totalPemasukan = transactions.reduce((total, t) => 
+  // 6. SESUAIKAN NAMA VARIABEL (savings -> tabungan, transactions -> transaksi)
+  const totalSaldo = tabungan.reduce((total, t) => total + t.jumlah, 0);
+  const totalPemasukan = transaksi.reduce((total, t) => 
     t.tipe === 'pemasukan' ? total + t.jumlah : total, 0
   );
-  const totalPengeluaran = transactions.reduce((total, t) => 
+  const totalPengeluaran = transaksi.reduce((total, t) => 
     t.tipe === 'pengeluaran' ? total + t.jumlah : total, 0
   );
 
@@ -96,11 +71,11 @@ export default function FileTab() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{savings.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{tabungan.length}</div>
               <p className="text-sm text-gray-600">Total Tabungan</p>
             </div>
             <div className="text-center p-4 border rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{transactions.length}</div>
+              <div className="text-2xl font-bold text-green-600">{transaksi.length}</div>
               <p className="text-sm text-gray-600">Total Transaksi</p>
             </div>
             <div className="text-center p-4 border rounded-lg">
@@ -141,26 +116,26 @@ export default function FileTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Button
                 onClick={() => setShowExportDialog(true)}
-                disabled={transactions.length === 0}
+                disabled={transaksi.length === 0}
                 className="h-20 flex-col gap-2 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <FileSpreadsheet className="h-6 w-6" />
                 <span>Export Laporan Keuangan</span>
                 <span className="text-xs text-blue-100">
-                  {transactions.length} transaksi • {savings.length} tabungan
+                  {transaksi.length} transaksi • {tabungan.length} tabungan
                 </span>
               </Button>
               
               <Button
                 onClick={() => setShowExportDialog(true)}
-                disabled={transactions.length === 0}
+                disabled={transaksi.length === 0}
                 variant="outline"
                 className="h-20 flex-col gap-2"
               >
                 <Settings className="h-6 w-6" />
                 <span>Pilih Format Export</span>
                 <span className="text-xs text-gray-500">
-                  Merge tanggal atau format asli
+                  Export ke format .xlsx
                 </span>
               </Button>
             </div>
@@ -168,12 +143,10 @@ export default function FileTab() {
             <div className="bg-blue-50 p-4 rounded-lg">
               <h4 className="font-medium text-blue-800 mb-2">Fitur Export:</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Format sesuai template yang kamu upload</li>
-                <li>• Tanggal yang sama di-merge untuk efisiensi</li>
-                <li>• Deskripsi diambil dari input user</li>
-                <li>• Tabungan menyesuaikan data aplikasi</li>
-                <li>• Format: .csv (Excel Compatible)</li>
+                <li>• Data diambil langsung dari aplikasi</li>
+                <li>• Format file: .xlsx (Excel Compatible)</li>
                 <li>• Otomatis download ke browser</li>
+                <li>• Aman, tidak melalui server</li>
               </ul>
             </div>
           </div>
@@ -214,68 +187,17 @@ export default function FileTab() {
             <div className="bg-amber-50 p-4 rounded-lg">
               <h4 className="font-medium text-amber-800 mb-2">Panduan Import:</h4>
               <ul className="text-sm text-amber-700 space-y-1">
-                <li>• Gunakan template export sebagai referensi format</li>
-                <li>• Format tanggal: YYYY-MM-DD (contoh: 2024-12-01)</li>
-                <li>• Kolom deskripsi bebas sesuai input user</li>
-                <li>• Setiap baris akan menjadi transaksi individual</li>
-                <li>• Sistem otomatis mapping kategori berdasarkan deskripsi</li>
+                <li>• Export data terlebih dahulu untuk mendapatkan template</li>
+                <li>• Pastikan file memiliki kolom: Tanggal, Judul, Jumlah, Tipe</li>
+                <li>• Kolom 'Tabungan' akan cocokkan dengan nama tabungan di aplikasi</li>
                 <li>• Data duplikat akan ditambah sebagai transaksi baru</li>
-                <li>• Support export dengan merge tanggal</li>
               </ul>
             </div>
-
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-800 mb-2">Template:</h4>
-              <p className="text-sm text-gray-600 mb-3">
-                Template export yang sudah di-generate bisa langsung digunakan untuk import.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                  Export dulu → Edit → Import kembali
-                </Badge>
-                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                  Format otomatis sesuai aplikasi
-                </Badge>
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Status Fitur</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                Ready
-              </Badge>
-              <span className="text-sm">Export transaksi dengan merge tanggal</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                Ready
-              </Badge>
-              <span className="text-sm">Import transaksi dari Excel</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                Smart
-              </Badge>
-              <span className="text-sm">Otomatis mapping kategori dan deskripsi</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
-                Efficient
-              </Badge>
-              <span className="text-sm">Merge tanggal untuk tampilan yang rapi</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* 7. PERBAIKI PEMANGGILAN DIALOG */}
       <ExportDialog
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
@@ -285,6 +207,7 @@ export default function FileTab() {
       <ImportDialog
         open={showImportDialog}
         onOpenChange={setShowImportDialog}
+        onImport={handleImport} // <-- TERUSKAN FUNGSI IMPORT BARU
       />
     </div>
   );

@@ -27,6 +27,7 @@ import { validateImportFile } from '@/lib/excel-importer';
 interface ImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onImport: (file: File) => Promise<void>;
 }
 
 interface ImportResult {
@@ -36,7 +37,7 @@ interface ImportResult {
   transactions: any[];
 }
 
-export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
+export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -84,31 +85,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
     setIsImporting(true);
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/import/transactions', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setImportResult(result);
-        
-        if (result.imported > 0) {
-          toast.success(`Berhasil import ${result.imported} transaksi!`);
-        } else {
-          toast.warning('Tidak ada transaksi yang berhasil diimport');
-        }
-        
-        // Trigger parent component to refetch data
-        window.dispatchEvent(new CustomEvent('import-complete'));
-        
-      } else {
-        toast.error(result.error || 'Import gagal');
-      }
+      await onImport(file);
     } catch (error) {
       console.error('Import error:', error);
       toast.error('Terjadi kesalahan saat import. Silakan coba lagi.');

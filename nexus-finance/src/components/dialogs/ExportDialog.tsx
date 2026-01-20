@@ -21,27 +21,29 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+// 1. PERBAIKI TIPE PROPS
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExport: (type: string) => Promise<void>;
+  onExport: (type: 'transactions' | 'savings') => Promise<void>; // <-- Ubah string menjadi union type
 }
 
 export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps) {
   const [isExporting, setIsExporting] = useState(false);
-  const [exportType, setExportType] = useState<string>('');
+  const [exportType, setExportType] = useState<'transactions' | 'savings' | ''>(''); // <-- Perbaiki tipe state
 
-  const handleExportClick = async (type: string) => {
+  // 2. PERBAIKI TIPE PARAMETER FUNGSI
+  const handleExportClick = async (type: 'transactions' | 'savings') => { // <-- Ubah string menjadi union type
     setIsExporting(true);
     setExportType(type);
     
     try {
       await onExport(type);
-      toast.success(`Export ${type} berhasil!`);
+      toast.success(`Export ${type === 'savings' ? 'Tabungan' : 'Transaksi'} berhasil!`);
       onOpenChange(false);
     } catch (error) {
       console.error('Export error:', error);
-      toast.error(`Export ${type} gagal. Silakan coba lagi.`);
+      toast.error(`Export ${type === 'savings' ? 'Tabungan' : 'Transaksi'} gagal. Silakan coba lagi.`);
     } finally {
       setIsExporting(false);
       setExportType('');
@@ -50,29 +52,29 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
 
   const exportOptions = [
     {
-      id: 'transactions',
+      id: 'transactions' as const, // <-- Tambahkan 'as const' untuk infer tipe yang lebih spesifik
       title: 'Laporan Keuangan',
-      description: 'Export semua transaksi dengan merge tanggal',
+      description: 'Export semua transaksi',
       icon: FileSpreadsheet,
       color: 'blue',
       features: [
-        'Merge tanggal untuk efisiensi',
+        'Export semua transaksi',
         'Deskripsi dari input user',
-        'Tabungan sesuai aplikasi',
-        'Format: .csv (Excel Compatible)'
+        'Nama tabungan tercantum',
+        'Format: .xlsx (Excel Compatible)' // <-- 3. PERBAIKI TEKS FORMAT
       ]
     },
     {
-      id: 'savings',
+      id: 'savings' as const, // <-- Tambahkan 'as const'
       title: 'Laporan Tabungan',
-      description: 'Export data tabungan dan progresnya',
+      description: 'Export data tabungan dan saldonya',
       icon: Calendar,
       color: 'green',
       features: [
-        'Progres persentase',
-        'Target vs terkumpul',
-        'Status pencapaian',
-        'Format: .csv (Excel Compatible)'
+        'Nama tabungan',
+        'Saldo terkini',
+        'Tanggal pembuatan',
+        'Format: .xlsx (Excel Compatible)' // <-- 3. PERBAIKI TEKS FORMAT
       ]
     }
   ];
@@ -154,10 +156,9 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
                 <h4 className="font-medium text-blue-800">Informasi Export:</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
                   <li>• File akan otomatis di-download ke browser kamu</li>
-                  <li>• Format file: .csv (Excel Compatible)</li>
-                  <li>• Export dengan merge tanggal untuk tampilan yang rapi</li>
+                  <li>• Format file: .xlsx (Excel Compatible)</li>
                   <li>• Data terbaru dari aplikasi akan di-export</li>
-                  <li>• File export bisa langsung digunakan untuk import kembali</li>
+                  <li>• Aman, diproses langsung di browser tanpa server</li>
                 </ul>
               </div>
             </div>
@@ -170,12 +171,12 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
               Ready to Export
             </Badge>
             <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-              <Calendar className="h-3 w-3 mr-1" />
-              Auto-merge Dates
+              <FileSpreadsheet className="h-3 w-3 mr-1" />
+              Excel Format
             </Badge>
             <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
               <Settings className="h-3 w-3 mr-1" />
-              Smart Formatting
+              Client-Side Processing
             </Badge>
           </div>
         </div>
