@@ -11,7 +11,17 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 
 // 3. Inisialisasi Prisma Client (Singleton Pattern untuk Next.js)
+const connectionString = process.env.DATABASE_URL;
+
 const prismaClientSingleton = () => {
+  // Jika URL tidak ada, kita buat client tanpa adapter agar tidak crash saat build
+  // Tapi saat runtime (di Vercel), URL pasti ada.
+  if (!connectionString) {
+    return new PrismaClient();
+  }
+
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 };
 
