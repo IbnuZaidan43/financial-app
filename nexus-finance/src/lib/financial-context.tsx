@@ -49,7 +49,6 @@ interface FinancialContextType {
     kategoriId?: number;
     tabunganId?: number;
   }) => Promise<any>;
-  // Local storage integration
   dataSource: DataSource;
   isOnline: boolean;
   lastSync: Date | null;
@@ -62,11 +61,11 @@ interface FinancialContextType {
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
 
 const getUserId = () => {
-  if (typeof window === 'undefined') return 'default_user';
+  if (typeof window === 'undefined') return '00000000-0000-0000-0000-000000000000';
   
   let id = localStorage.getItem('financeUserId');
   if (!id) {
-    id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    id = crypto.randomUUID();
     localStorage.setItem('financeUserId', id);
     console.log('🆔 Generated new userId:', id);
   } else {
@@ -95,10 +94,11 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   });
   
   const syncToCloud = async (type: 'transaksi' | 'tabungan', data: any) => {
-    if (!navigator.onLine) {
-      setSyncStatus('offline');
+    if (!navigator.onLine || userId === 'default_user') {
+      if (!navigator.onLine) setSyncStatus('offline');
       return;
     }
+    
     setSyncStatus('syncing');
     try {
       if (type === 'transaksi') {
@@ -128,6 +128,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         setTabungan(localTabungan);
         setTransaksi(localTransaksi);
         setLastSync(new Date());
+
+        if (navigator.onLine) {
+          forceSync();
+        }
       });
     }
   }, [userId]);
@@ -272,6 +276,16 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  useEffect(() => {
+  const handleOnline = () => {
+    console.log('🌐 Internet terdeteksi aktif! Menjalankan sinkronisasi otomatis...');
+    forceSync(); 
+  };
+
+  window.addEventListener('online', handleOnline);
+  return () => window.removeEventListener('online', handleOnline);
+}, [forceSync]);
+
   const exportData = async (type: 'transactions' | 'savings') => {
   try {
     let worksheet: XLSX.WorkSheet;
@@ -325,7 +339,7 @@ const importData = async (file: File) => {
         for (const row of jsonData as any[]) {
           if (row.Tanggal && row.Jumlah && row.Tipe) {
             const newTransaction: TransaksiData = {
-              id: Date.now() + Math.random(),
+              id: Math.floor(Date.now() + Math.random()),
               judul: row.Judul || 'Transaksi Import',
               jumlah: parseFloat(row.Jumlah),
               deskripsi: row.Keterangan || null,
@@ -339,8 +353,7 @@ const importData = async (file: File) => {
             importedTransactions.push(newTransaction);
           }
         }
-
-        // Update state dan local storage
+        
         const updatedTransaksi = [...importedTransactions, ...transaksi];
         setTransaksi(updatedTransaksi);
         await updateData(tabungan, updatedTransaksi);
@@ -392,4 +405,3 @@ export function useFinancial() {
   }
   return context;
 }
-// perubahan
