@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
+export const dynamic = 'force-dynamic';
+
 // Helper function untuk mendapatkan userId dari request
 const getUserIdFromRequest = (request: NextRequest) => {
   const url = new URL(request.url);

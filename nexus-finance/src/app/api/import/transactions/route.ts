@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { importTransactionsFromExcel } from '@/lib/excel-importer'
 import { db } from '@/lib/db'
 
+export const dynamic = 'force-dynamic';
+
 interface SavedTransaction {
   id: number;
   judul: string;

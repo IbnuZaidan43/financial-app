@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { exportSavings } from '@/lib/excel-exporter'
 import { db } from '@/lib/db'
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const savings = await db.tabungan.findMany({
