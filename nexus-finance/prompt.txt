@@ -1,9 +1,42 @@
+oke aku pakai src/lib.prisma.ts ini berarti
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+
+// 1. Konfigurasi Pool koneksi dari driver 'pg'
+const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL 
+});
+
+// 2. Buat Adapter untuk Prisma 7
+const adapter = new PrismaPg(pool);
+
+// 3. Inisialisasi Prisma Client (Singleton Pattern untuk Next.js)
+const prismaClientSingleton = () => {
+  return new PrismaClient({ adapter });
+};
+
+type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClientSingleton | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
+
+export default prisma;
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+
+
+Sekarang sesuaikan financial-contaxt.tsx aku ini tanpa mengubah logika yang sudah berjalan sebelumnya serta menunjukkan bagian mana yang berubah / ditambahkan agar sesuai dengan konsep kita local-first, cloud synced(?)
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { syncTransaksiToCloud, syncTabunganToCloud } from '@/app/actions';
+import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 
 // Interface untuk data dari API (mungkin berbeda dari Prisma types)
@@ -61,77 +94,69 @@ interface FinancialContextType {
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
 
+// Helper function untuk user management (tidak berubah)
 const getUserId = () => {
-  if (typeof window === 'undefined') return 'default_user';
-  
-  let id = localStorage.getItem('financeUserId');
-  if (!id) {
-    id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('financeUserId', id);
-    console.log('🆔 Generated new userId:', id);
-  } else {
-    console.log('🆔 Using existing userId:', id);
+  if (typeof window === 'undefined') {
+    return 'default_user';
   }
-  return id;
+  
+  let userId = localStorage.getItem('financeUserId');
+  if (!userId) {
+    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('financeUserId', userId);
+    console.log('🆔 Generated new userId:', userId);
+  } else {
+    console.log('🆔 Using existing userId:', userId);
+  }
+  
+  return userId;
 };
 
 export function FinancialProvider({ children }: { children: ReactNode }) {
   const [tabungan, setTabungan] = useState<TabunganData[]>([]);
   const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
   const [userId, setUserId] = useState<string>('default_user');
+  
+  // State untuk sinkronisasi (disederhanakan)
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
+  // Initialize local storage hook
   const {
     tabungan: localTabungan,
     transaksi: localTransaksi,
     isOnline,
     loadFromLocal,
+    saveToLocal,
     updateData
   } = useLocalStorage({
-    userId,
+    userId: 'default_user', // Akan diperbarui saat userId siap
     autoSave: true,
     autoLoad: true
   });
-  
-  const syncToCloud = async (type: 'transaksi' | 'tabungan', data: any) => {
-    if (!navigator.onLine) {
-      setSyncStatus('offline');
-      return;
-    }
-    setSyncStatus('syncing');
-    try {
-      if (type === 'transaksi') {
-        await syncTransaksiToCloud(userId, data);
-      } else {
-        await syncTabunganToCloud(userId, data);
-      }
-      setSyncStatus('synced');
-      setLastSync(new Date());
-    } catch (error) {
-      console.error(`☁️ Sync Error (${type}):`, error);
-      setSyncStatus('error');
-    }
-  };
 
+  // Initialize userId on mount
   useEffect(() => {
     const currentUserId = getUserId();
     setUserId(currentUserId);
     console.log('👤 FinancialProvider initialized with userId:', currentUserId);
   }, []);
 
+  // Load initial data dari local storage saat userId siap
   useEffect(() => {
     if (userId !== 'default_user') {
       console.log('🚀 FinancialProvider mounted, loading initial data for userId:', userId);
       loadFromLocal().then(() => {
         console.log('📱 Local data loaded');
+        // Update state dengan data dari local storage
         setTabungan(localTabungan);
         setTransaksi(localTransaksi);
-        setLastSync(new Date());
+        setLastSync(new Date()); // Set last sync saat data dimuat
       });
     }
   }, [userId]);
 
+  // Fungsi refresh hanya mengambil data dari local storage
   const refreshTabungan = async () => {
     console.log('🔄 Refreshing tabungan from local storage...');
     try {
@@ -145,6 +170,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshTransaksi = async () => {
+    console.log('🔄 Refreshing transaksi from local storage...');
     try {
       await loadFromLocal();
       setTransaksi(localTransaksi);
@@ -155,28 +181,33 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Update balance langsung di state dan local storage
   const updateTabunganBalance = (id: number, newBalance: number) => {
-    const target = tabungan.find(t => t.id === id);
-    if (!target) return;
-
-    const updatedTab: TabunganData = { 
-      ...target, 
-      jumlah: newBalance, 
-      updatedAt: new Date() 
-    };
+    console.log('🔄 Updating balance in context:', { id, newBalance, userId });
     
-    const newList = tabungan.map((t): TabunganData => 
-      t.id === id ? updatedTab : t
+    const updatedTabungan = tabungan.map(t => 
+      t.id === id ? { ...t, jumlah: newBalance, updatedAt: new Date() } : t
     );
-
-    setTabungan(newList);
-    updateData(newList, transaksi);
-    syncToCloud('tabungan', updatedTab);
+    
+    setTabungan(updatedTabungan);
+    
+    try {
+      updateData(updatedTabungan, transaksi);
+      setLastSync(new Date());
+      console.log('💾 Balance updated in local storage');
+    } catch (error) {
+      console.warn('⚠️ Failed to update balance in local storage:', error);
+    }
+    
+    console.log('✅ Balance updated in context');
   };
 
+  // Create tabungan langsung di state dan local storage
   const createTabungan = async (data: { nama: string; saldoAwal: number }) => {
+    console.log('💾 Creating tabungan locally:', data);
+    
     const newTabungan: TabunganData = {
-      id: Date.now(),
+      id: Date.now(), // Gunakan timestamp sebagai ID
       nama: data.nama,
       saldoAwal: data.saldoAwal,
       jumlah: data.saldoAwal,
@@ -184,20 +215,24 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date()
     };
     
-    const updatedTabunganList = [...tabungan, newTabungan];
-    setTabungan(updatedTabunganList);
+    const updatedTabungan = [...tabungan, newTabungan];
+    setTabungan(updatedTabungan);
     
     try {
-      await updateData(updatedTabunganList, transaksi);
+      await updateData(updatedTabungan, transaksi);
       setLastSync(new Date());
-      syncToCloud('tabungan', newTabungan);
-      return newTabungan;
+      console.log('✅ Tabungan created and saved locally');
     } catch (error) {
+      // Revert state jika gagal menyimpan
       setTabungan(tabungan);
+      console.error('❌ Failed to save tabungan:', error);
       throw error;
     }
+    
+    return newTabungan;
   };
 
+  // Create transaksi langsung di state dan local storage
   const createTransaksi = async (data: {
     judul: string;
     jumlah: number;
@@ -207,6 +242,8 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     kategoriId?: number;
     tabunganId?: number;
   }) => {
+    console.log('💾 Creating transaction locally:', data);
+    
     const newTransaksi: TransaksiData = {
       id: Date.now(),
       judul: data.judul,
@@ -219,50 +256,53 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-
-    let affectedTabungan: TabunganData | null = null;
-    let updatedTabunganList: TabunganData[] = [...tabungan];
-
+    
+    const updatedTransaksi = [newTransaksi, ...transaksi];
+    setTransaksi(updatedTransaksi);
+    
+    // Update saldo tabungan jika ada tabunganId
+    let updatedTabungan = tabungan;
     if (data.tabunganId) {
-      updatedTabunganList = tabungan.map((t): TabunganData => {
-        if (t.id === data.tabunganId) {
-          const change = data.tipe === 'pengeluaran' ? -data.jumlah : data.jumlah;
-          const updatedObj = { ...t, jumlah: t.jumlah + change, updatedAt: new Date() };
-          affectedTabungan = updatedObj;
-          return updatedObj;
-        }
-        return t;
-      });
+      const currentTabungan = tabungan.find(t => t.id === data.tabunganId);
+      if (currentTabungan) {
+        const newBalance = data.tipe === 'pengeluaran' 
+          ? currentTabungan.jumlah - data.jumlah 
+          : currentTabungan.jumlah + data.jumlah;
+        
+        updatedTabungan = tabungan.map(t => 
+          t.id === data.tabunganId 
+            ? { ...t, jumlah: newBalance, updatedAt: new Date() } 
+            : t
+        );
+        setTabungan(updatedTabungan);
+      }
     }
-
-    const updatedTransaksiList = [newTransaksi, ...transaksi];
-    setTransaksi(updatedTransaksiList);
-    setTabungan(updatedTabunganList);
     
     try {
-      await updateData(updatedTabunganList, updatedTransaksiList);
+      await updateData(updatedTabungan, updatedTransaksi);
       setLastSync(new Date());
-      syncToCloud('transaksi', newTransaksi);
-      if (affectedTabungan) {
-        syncToCloud('tabungan', affectedTabungan);
-      }
-      
-      return newTransaksi;
+      console.log('✅ Transaction created and saved locally');
     } catch (error) {
+      // Revert state jika gagal menyimpan
       setTransaksi(transaksi);
-      setTabungan(tabungan);
+      if (data.tabunganId) {
+        setTabungan(tabungan);
+      }
+      console.error('❌ Failed to save transaction:', error);
       throw error;
     }
+    
+    return newTransaksi;
   };
 
+  // Force sync hanya me-refresh data dari local storage
   const forceSync = async () => {
     console.log('🔄 "Syncing" is just refreshing local data...');
     setSyncStatus('syncing');
     
     try {
-      await loadFromLocal();
-      setTabungan(localTabungan);
-      setTransaksi(localTransaksi);
+      await refreshTabungan();
+      await refreshTransaksi();
       setSyncStatus('synced');
       setLastSync(new Date());
       console.log('✅ Local data refreshed');
@@ -278,6 +318,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     let fileName: string;
 
     if (type === 'transactions') {
+      // Siapkan data untuk transaksi
       const dataForExcel = transaksi.map(t => ({
         Tanggal: t.tanggal,
         Judul: t.judul,
@@ -289,6 +330,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       worksheet = XLSX.utils.json_to_sheet(dataForExcel);
       fileName = `Laporan_Keuangan_${new Date().toISOString().split('T')[0]}.xlsx`;
     } else {
+      // Siapkan data untuk tabungan
       const dataForExcel = tabungan.map(t => ({
         Nama: t.nama,
         Saldo: t.jumlah,
@@ -298,9 +340,22 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       fileName = `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.xlsx`;
     }
 
+    // Buat workbook dan tambahkan worksheet
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, type === 'transactions' ? 'Transaksi' : 'Tabungan');
-    XLSX.writeFile(workbook, fileName);
+
+    // Konversi workbook ke buffer lalu trigger download
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 
     console.log(`✅ ${type} exported successfully`);
   } catch (error) {
@@ -317,15 +372,19 @@ const importData = async (file: File) => {
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
+        
+        // Asumsikan kita mengimpor dari sheet pertama
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        const importedTransactions: TransaksiData[] = [];
+        // Validasi dan proses data yang diimpor
+        const importedTransactions: any[] = [];
         for (const row of jsonData as any[]) {
+          // Sesuaikan dengan kolom di Excel kamu
           if (row.Tanggal && row.Jumlah && row.Tipe) {
-            const newTransaction: TransaksiData = {
-              id: Date.now() + Math.random(),
+            const newTransaction = {
+              id: Date.now() + Math.random(), // ID sementara
               judul: row.Judul || 'Transaksi Import',
               jumlah: parseFloat(row.Jumlah),
               deskripsi: row.Keterangan || null,
@@ -344,12 +403,8 @@ const importData = async (file: File) => {
         const updatedTransaksi = [...importedTransactions, ...transaksi];
         setTransaksi(updatedTransaksi);
         await updateData(tabungan, updatedTransaksi);
-
-        importedTransactions.forEach(item => {
-          syncToCloud('transaksi', item);
-        });
-
         setLastSync(new Date());
+
         console.log(`✅ ${importedTransactions.length} transactions imported successfully`);
         resolve(importedTransactions);
       } catch (error) {
@@ -372,10 +427,11 @@ const importData = async (file: File) => {
       userId,
       createTabungan,
       createTransaksi,
-      dataSource: 'local',
-      isOnline: !!isOnline,
-      syncStatus,
+      // Local storage integration
+      dataSource: 'local', // Selalu 'local'
+      isOnline,
       lastSync,
+      syncStatus,
       forceSync,
       exportData,
       importData
@@ -392,4 +448,3 @@ export function useFinancial() {
   }
   return context;
 }
-// perubahan
