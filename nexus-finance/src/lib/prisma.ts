@@ -7,11 +7,10 @@ const connectionString = process.env.DATABASE_URL;
 const prismaClientSingleton = () => {
   const pool = new Pool({ 
     connectionString: connectionString || "",
-    max: process.env.NODE_ENV === 'production' ? 10 : 1 
+    max: 1 
   });
   
   const adapter = new PrismaPg(pool);
-
   return new PrismaClient({ adapter });
 };
 
