@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { auth } from '@/lib/auth'
 import * as XLSX from 'xlsx'
 
 export const dynamic = 'force-dynamic';
@@ -10,19 +11,20 @@ interface TransactionData {
   deskripsi: string;
   tanggal: Date;
   tipe: 'pemasukan' | 'pengeluaran';
-  kategoriId: number | null;
+  kategoriId: string | null;
 }
 
 interface SavedTransaction {
-  id: number;
+  id: string;
   judul: string;
   jumlah: number;
   deskripsi: string;
   tanggal: Date;
   tipe: string;
-  kategoriId: number | null;
+  kategoriId: string | null;
+  userId: string;
   kategori: {
-    id: number;
+    id: string;
     nama: string;
     jenis: string;
     icon: string | null;
@@ -36,6 +38,11 @@ interface SavedTransaction {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
 
@@ -46,7 +53,9 @@ export async function POST(request: NextRequest) {
     const buffer = await file.arrayBuffer()
     const workbook = XLSX.read(buffer, { type: 'buffer' })
     const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+
     const savings = await db.tabungan.findMany({
+      where: { userId: session.user.id },
       orderBy: { nama: 'asc' }
     })
 
@@ -58,9 +67,7 @@ export async function POST(request: NextRequest) {
     while (rowNum <= maxRows) {
       const rowData = extractRowData(worksheet, rowNum, tabunganNames)
       
-      if (!rowData.hasData) {
-        break
-      }
+      if (!rowData.hasData) break;
 
       const transaction: TransactionData = {
         judul: extractJudulFromDeskripsi(rowData.deskripsi),
@@ -79,12 +86,15 @@ export async function POST(request: NextRequest) {
     for (const trans of transactions) {
       try {
         const saved = await db.transaksi.create({
-          data: trans,
+          data: {
+            ...trans,
+            userId: session.user.id
+          },
           include: {
             kategori: true
           }
         })
-        savedTransactions.push(saved as SavedTransaction)
+        savedTransactions.push(saved as unknown as SavedTransaction)
       } catch (saveError) {
         console.error('Error saving transaction:', saveError)
       }
@@ -103,45 +113,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function extractRowData(worksheet: any, rowNum: number, tabunganNames: string[]) {
-  try {
-    const deskripsiCell = worksheet[`X${rowNum}`]
-    const deskripsi = deskripsiCell ? String(deskripsiCell.v || '').trim() : ''
-    const totalCell = worksheet[`W${rowNum}`]
-    const totalAmount = totalCell ? (totalCell.v || 0) : 0
-    let tanggal = ''
-    const dateCell = worksheet[`B${rowNum}`]
-    
-    if (dateCell) {
-      if (dateCell.t) {
-        const masterCell = worksheet[XLSX.utils.encode_cell(dateCell.t)]
-        tanggal = masterCell ? String(masterCell.v || '') : ''
-      } else {
-        tanggal = String(dateCell.v || '')
-      }
-    }
-
-    const hasData = deskripsi || totalAmount !== 0 || tanggal
-
-    return {
-      hasData,
-      tanggal,
-      deskripsi,
-      totalAmount
-    }
-  } catch (error) {
-    console.error(`Error extracting row ${rowNum}:`, error)
-    return { hasData: false, tanggal: '', deskripsi: '', totalAmount: 0 }
-  }
-}
-
-function extractJudulFromDeskripsi(deskripsi: string): string {
-  const cleanDeskripsi = deskripsi.replace(/[^\w\s]/g, '').trim()
-  const words = cleanDeskripsi.split(' ')
-  return words.slice(0, 4).join(' ') || 'Transaksi Import'
-}
-
-async function getCategoryIdFromDeskripsi(deskripsi: string): Promise<number | null> {
+async function getCategoryIdFromDeskripsi(deskripsi: string): Promise<string | null> {
   try {
     const keywords = {
       'gaji': 'Gaji',
@@ -193,4 +165,42 @@ async function getCategoryIdFromDeskripsi(deskripsi: string): Promise<number | n
     console.error('Error getting category ID:', error)
     return null
   }
+}
+
+function extractRowData(worksheet: any, rowNum: number, tabunganNames: string[]) {
+  try {
+    const deskripsiCell = worksheet[`X${rowNum}`]
+    const deskripsi = deskripsiCell ? String(deskripsiCell.v || '').trim() : ''
+    const totalCell = worksheet[`W${rowNum}`]
+    const totalAmount = totalCell ? (totalCell.v || 0) : 0
+    let tanggal = ''
+    const dateCell = worksheet[`B${rowNum}`]
+    
+    if (dateCell) {
+      if (dateCell.t) {
+        const masterCell = worksheet[XLSX.utils.encode_cell(dateCell.t)]
+        tanggal = masterCell ? String(masterCell.v || '') : ''
+      } else {
+        tanggal = String(dateCell.v || '')
+      }
+    }
+
+    const hasData = deskripsi || totalAmount !== 0 || tanggal
+
+    return {
+      hasData,
+      tanggal,
+      deskripsi,
+      totalAmount
+    }
+  } catch (error) {
+    console.error(`Error extracting row ${rowNum}:`, error)
+    return { hasData: false, tanggal: '', deskripsi: '', totalAmount: 0 }
+  }
+}
+
+function extractJudulFromDeskripsi(deskripsi: string): string {
+  const cleanDeskripsi = deskripsi.replace(/[^\w\s]/g, '').trim()
+  const words = cleanDeskripsi.split(' ')
+  return words.slice(0, 4).join(' ') || 'Transaksi Import'
 }

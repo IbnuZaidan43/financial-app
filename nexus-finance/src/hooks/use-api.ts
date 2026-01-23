@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react'
 import type { Tabungan, Transaksi } from '@prisma/client'
 
 interface Transaction {
-  id: number
+  id: string
   judul: string
   jumlah: number
   deskripsi?: string
   tanggal: string
   tipe: 'pemasukan' | 'pengeluaran'
-  kategoriId?: number
+  kategoriId?: string
   kategori?: {
-    id: number
+    id: string
     nama: string
     jenis: string
     icon?: string
@@ -18,7 +18,6 @@ interface Transaction {
   }
 }
 
-// Gunakan type dari Prisma agar selalu sync
 type Savings = Tabungan
 
 interface DashboardStats {
@@ -131,7 +130,7 @@ export function useSavings() {
   }
 
   // ✅ Method untuk update balance (transaksi)
-  const updateBalance = async (id: number, jumlah: number) => {
+  const updateBalance = async (id: string, jumlah: number) => {
     try {
       console.log('🔄 updateBalance called:', { id, jumlah })
       const response = await fetch('/api/savings/balance', {
@@ -160,7 +159,7 @@ export function useSavings() {
   }
 
   // ✅ Method untuk edit tabungan (nama & saldoAwal)
-  const updateSavings = async (id: number, data: { nama?: string; saldoAwal?: number }) => {
+  const updateSavings = async (id: string, data: { nama?: string; saldoAwal?: number }) => {
     try {
       console.log('🔄 updateSavings called:', { id, data })
       const response = await fetch('/api/savings', {

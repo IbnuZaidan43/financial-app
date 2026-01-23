@@ -637,10 +637,10 @@ export class OfflineQueueManager {
     this.listeners.delete(listener);
   }
 
-  private emit(event: string, data: any): void {
+  private emit(event: string, data?: any): void {
     this.listeners.forEach(listener => {
       try {
-        listener(event, data);
+        listener(event, data ?? {});
       } catch (error) {
         console.error('Event listener error:', error);
       }

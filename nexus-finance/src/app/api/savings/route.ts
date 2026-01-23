@@ -4,7 +4,6 @@ import type { Tabungan } from '@prisma/client'
 
 export const dynamic = 'force-dynamic';
 
-// Helper function untuk mendapatkan userId dari request
 const getUserIdFromRequest = (request: NextRequest) => {
   const url = new URL(request.url);
   return url.searchParams.get('userId') || 'default_user';
@@ -18,7 +17,7 @@ export async function GET(request: NextRequest) {
     
     const tabungan = await db.tabungan.findMany({
       where: {
-        userId: userId  // ← NEW: Filter per user
+        userId: userId
       },
       orderBy: {
         createdAt: 'desc'
@@ -37,9 +36,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nama, saldoAwal, userId } = body  // ← NEW: Ambil userId dari body
-    
-    // Use provided userId or default
+    const { nama, saldoAwal, userId } = body
     const finalUserId = userId || 'default_user';
     
     console.log('💾 Creating savings for userId:', finalUserId, { nama, saldoAwal });
@@ -49,7 +46,7 @@ export async function POST(request: NextRequest) {
         nama,
         saldoAwal: parseFloat(saldoAwal) || 0,
         jumlah: parseFloat(saldoAwal) || 0,
-        userId: finalUserId  // ← NEW: Tambah userId
+        userId: finalUserId
       }
     })
     
@@ -65,18 +62,15 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, nama, saldoAwal, userId } = body  // ← NEW: Ambil userId dari body
-    
-    // Use provided userId or default
+    const { id, nama, saldoAwal, userId } = body
     const finalUserId = userId || 'default_user';
     
     console.log('🔄 Updating savings for userId:', finalUserId, { id, nama, saldoAwal });
     
-    // Verify user owns this savings
     const existingTabungan = await db.tabungan.findFirst({
       where: {
-        id: parseInt(id),
-        userId: finalUserId  // ← NEW: Validate ownership
+        id: id,
+        userId: finalUserId
       }
     });
     
@@ -86,7 +80,7 @@ export async function PUT(request: NextRequest) {
     }
     
     const tabungan = await db.tabungan.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: { 
         nama,
         saldoAwal: parseFloat(saldoAwal) || 0
@@ -105,18 +99,15 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, userId } = body  // ← NEW: Ambil userId dari body
-    
-    // Use provided userId or default
+    const { id, userId } = body
     const finalUserId = userId || 'default_user';
     
     console.log('🗑️ Deleting savings for userId:', finalUserId, { id });
     
-    // Verify user owns this savings
     const existingTabungan = await db.tabungan.findFirst({
       where: {
-        id: parseInt(id),
-        userId: finalUserId  // ← NEW: Validate ownership
+        id: id,
+        userId: finalUserId
       }
     });
     
@@ -126,7 +117,7 @@ export async function DELETE(request: NextRequest) {
     }
     
     await db.tabungan.delete({
-      where: { id: parseInt(id) }
+      where: { id: id }
     })
     
     console.log('✅ Savings deleted successfully');

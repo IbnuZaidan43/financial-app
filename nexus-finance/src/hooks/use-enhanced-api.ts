@@ -47,7 +47,7 @@ export function useAPI<T = any>(
 
   // State
   const [state, setState] = useState<UseAPIState<T>>({
-    data: initialData || null,
+    data: (initialData ?? null) as T | null,
     loading: enabled,
     error: null,
     cached: false,
@@ -102,7 +102,7 @@ export function useAPI<T = any>(
       if (mountedRef.current) {
         setState(prev => ({
           ...prev,
-          data: transformedData,
+          data: transformedData as T | null,
           loading: false,
           refetching: false,
           error: null,
@@ -202,20 +202,24 @@ export function useAPI<T = any>(
   }, [execute]);
 
   // Mutate data locally
-  const mutate = useCallback((newData: T | ((prev: T | null) => T)) => {
-    setState(prev => ({
-      ...prev,
-      data: typeof newData === 'function' 
-        ? (newData as (prev: T | null) => T)(prev.data) 
-        : newData,
-      lastUpdated: Date.now()
-    }));
+  const mutate = useCallback((newData: T | null | ((prev: T | null) => T | null)) => {
+    setState(prev => {
+      const value = typeof newData === 'function' 
+        ? (newData as any)(prev.data) 
+        : newData;
+      
+      return {
+        ...prev,
+        data: value as T | null,
+        lastUpdated: Date.now()
+      };
+    });
   }, []);
 
   // Reset state
   const reset = useCallback(() => {
     setState({
-      data: initialData || null,
+      data: (initialData ?? null) as T | null,
       loading: false,
       error: null,
       cached: false,
@@ -240,7 +244,7 @@ export function useMultiAPI<T = any>(
   options: UseAPIHookOptions<T[]> = {}
 ) {
   const [state, setState] = useState<{
-    data: T[] | null;
+    data: (T | null)[] | null;
     loading: boolean;
     errors: string[];
     completed: number;
@@ -268,7 +272,7 @@ export function useMultiAPI<T = any>(
 
     const results = await Promise.allSettled(promises);
     
-    const data: T[] = new Array(endpoints.length);
+    const data: (T | null)[] = new Array(endpoints.length).fill(null);
     const errors: string[] = [];
     let completed = 0;
 
@@ -317,7 +321,7 @@ export function useAPICache() {
   const getStats = useCallback(async () => {
     setLoading(true);
     try {
-      const cacheStats = await apiClient.getCacheStats();
+      const cacheStats = await (apiClient as any).getCacheStats();
       setStats(cacheStats);
     } catch (error) {
       console.error('Failed to get cache stats:', error);
@@ -337,7 +341,7 @@ export function useAPICache() {
 
   const warmCache = useCallback(async (endpoints: string[]) => {
     try {
-      await apiClient.warmCache(endpoints);
+      await (apiClient as any).warmCache(endpoints);
       await getStats(); // Refresh stats
     } catch (error) {
       console.error('Failed to warm cache:', error);

@@ -39,7 +39,7 @@ import type { Tabungan as PrismaTabungan, Transaksi as PrismaTransaksi } from '@
 import { useFinancial } from '@/lib/financial-context';
 
 interface TabunganInterface {
-  id: number;
+  id: string;
   nama: string;
   saldoAwal: number;
   jumlah: number;
@@ -48,13 +48,13 @@ interface TabunganInterface {
 }
 
 interface TransaksiInterface {
-  id: number;
+  id: string;
   judul: string;
   jumlah: number;
   deskripsi?: string | null;
   tanggal: string | Date;
   tipe: string;
-  kategoriId?: number | null;
+  kategoriId?: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
 }
@@ -293,15 +293,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
             <span className="text-xs font-medium">Local</span>
           </Badge>
 
-          {/* NEW: PWA Install Status */}
-          {/* <Badge className={`${getPWAInstallColor()} flex items-center gap-1`}>
-            {getPWAInstallIcon()}
-            <span className="text-xs font-medium">
-              {canInstall ? 'Installable' : 'Not Installable'}
-            </span>
-          </Badge> */}
-
-          {/* PERBAIKAN: PWA Install Status */}
           <Badge className={`${canInstall ? 'bg-green-100 text-green-800 border-green-300' : 'bg-gray-100 text-gray-800 border-gray-300'} flex items-center gap-1`}>
             <Download className="w-4 h-4" />
             <span className="text-xs font-medium">
@@ -622,5 +613,3 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
     </div>
   );
 }
-
-// perubahan

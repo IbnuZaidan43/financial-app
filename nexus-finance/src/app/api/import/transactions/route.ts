@@ -1,23 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { importTransactionsFromExcel } from '@/lib/excel-importer'
 import { db } from '@/lib/db'
+import { auth } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic';
 
 interface SavedTransaction {
-  id: number;
+  id: string;
   judul: string;
   jumlah: number;
   deskripsi: string | null;
   tanggal: Date;
   tipe: string;
-  kategoriId: number | null;
+  kategoriId: string | null;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     
@@ -57,7 +64,8 @@ export async function POST(request: NextRequest) {
             deskripsi: transData.deskripsi,
             tanggal: new Date(transData.tanggal),
             tipe: transData.tipe,
-            kategoriId: kategori?.id
+            kategoriId: kategori?.id,
+            userId: session.user.id
           }
         })
         

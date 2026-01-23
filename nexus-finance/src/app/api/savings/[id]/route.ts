@@ -8,10 +8,10 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id)
+    const id = params.id
     
-    if (isNaN(id)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
     }
     
     await db.tabungan.delete({

@@ -30,7 +30,7 @@ import type { Tabungan as PrismaTabungan } from '@prisma/client';
 
 // Use the same type as in financial context to avoid conflicts
 type Tabungan = {
-  id: number;
+  id: string;
   nama: string;
   saldoAwal: number;
   jumlah: number;
@@ -242,7 +242,7 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
   };
 
-  const handleDelete = async (id: number, nama: string) => {
+  const handleDelete = async (id: string, nama: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus tabungan "${nama}"?`)) {
       try {
         console.log('🔄 Deleting tabungan:', { id, nama });

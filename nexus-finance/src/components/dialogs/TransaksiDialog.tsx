@@ -22,7 +22,7 @@ import {
 import { toast } from 'sonner';
 
 interface TabunganData {
-  id: number;
+  id: string;
   nama: string;
   saldoAwal: number;
   jumlah: number;
@@ -111,14 +111,14 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
     }
 
     try {
-      const selectedTabungan = tabungan.find(t => t.id!.toString() === formData.tabunganId);
+      const selectedTabungan = tabungan.find(t => t.id! === formData.tabunganId);
       if (!selectedTabungan) {
         toast.error('Tabungan tidak ditemukan');
         return;
       }
       console.log('📝 Creating transaction...');
       
-      const response = await fetch('/api/transactions?XTransformPort=3000', {
+      const response = await fetch('/api/transactions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

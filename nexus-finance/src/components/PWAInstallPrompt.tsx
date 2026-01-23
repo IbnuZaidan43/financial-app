@@ -7,8 +7,8 @@ import {
   Smartphone, 
   Monitor, 
   Chrome, 
-  Safari, 
-  Edge,
+  Globe,
+  Compass,
   CheckCircle,
   AlertCircle,
   Info
@@ -113,12 +113,10 @@ export default function PWAInstallPrompt({
   }
 
   const getBrowserIcon = () => {
-    switch (browser.toLowerCase()) {
-      case 'chrome': return <Chrome className="w-4 h-4" />;
-      case 'safari': return <Safari className="w-4 h-4" />;
-      case 'edge': return <Edge className="w-4 h-4" />;
-      default: return <Monitor className="w-4 h-4" />;
-    }
+    const b = browser.toLowerCase();
+    if (b.includes('safari')) return <Compass className="w-4 h-4" />;
+    if (b.includes('chrome') || b.includes('edge') || b.includes('firefox')) return <Globe className="w-4 h-4" />;
+    return <Monitor className="w-4 h-4" />;
   };
 
   const getPositionClasses = () => {

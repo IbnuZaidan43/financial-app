@@ -339,8 +339,8 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
                     variant="outline"
                     className="w-full"
                   >
-                    {config.autoProcessOnLine ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                    {config.autoProcessOnLine ? 'Pause Auto' : 'Resume Auto'}
+                    {config.autoProcessOnOnline ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                    {config.autoProcessOnOnline ? 'Pause Auto' : 'Resume Auto'}
                   </Button>
                 </div>
               </CardContent>

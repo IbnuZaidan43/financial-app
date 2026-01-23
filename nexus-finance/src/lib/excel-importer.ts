@@ -21,18 +21,14 @@ export async function importTransactionsFromExcel(buffer: ArrayBuffer): Promise<
   }
 
   try {
-    // Read Excel file
     const workbook = XLSX.read(buffer, { type: 'array' })
     const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-    
-    // Convert to JSON with raw values
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       header: 1,
       raw: false,
       defval: null
     })
 
-    // Find the data start row (usually row 6, after headers)
     let dataStartRow = 6
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i] as any[]
@@ -42,7 +38,6 @@ export async function importTransactionsFromExcel(buffer: ArrayBuffer): Promise<
       }
     }
 
-    // Find the total row to determine end of data
     let dataEndRow = jsonData.length
     for (let i = dataStartRow; i < jsonData.length; i++) {
       const row = jsonData[i] as any[]
@@ -52,7 +47,6 @@ export async function importTransactionsFromExcel(buffer: ArrayBuffer): Promise<
       }
     }
 
-    // Process each data row
     for (let i = dataStartRow; i < dataEndRow; i++) {
       const row = jsonData[i] as any[]
       
@@ -61,8 +55,9 @@ export async function importTransactionsFromExcel(buffer: ArrayBuffer): Promise<
         if (transaction) {
           result.transactions.push(transaction)
         }
-      } catch (error) {
-        result.errors.push(`Row ${i + 1}: ${error.message}`)
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown row error'
+        result.errors.push(`Row ${i + 1}: ${errorMessage}`)
       }
     }
 
@@ -70,8 +65,9 @@ export async function importTransactionsFromExcel(buffer: ArrayBuffer): Promise<
       result.errors.push('No valid transactions found in the file')
     }
 
-  } catch (error) {
-    result.errors.push(`Failed to read Excel file: ${error.message}`)
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to parse Excel file'
+    result.errors.push(errorMessage)
   }
 
   return result

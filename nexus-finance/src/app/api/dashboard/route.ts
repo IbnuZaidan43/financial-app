@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // Get total pemasukan dan pengeluaran
     const totalPemasukan = await db.transaksi.aggregate({
       where: { tipe: 'pemasukan' },
       _sum: { jumlah: true }
@@ -16,7 +15,6 @@ export async function GET() {
       _sum: { jumlah: true }
     })
     
-    // Get transactions for last 7 days
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
     

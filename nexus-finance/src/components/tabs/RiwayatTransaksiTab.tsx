@@ -29,20 +29,20 @@ import { useFinancial } from '@/lib/financial-context';
 
 // Interface yang sesuai dengan schema baru
 interface TransaksiData {
-  id: number;
+  id: string;
   judul: string;
   jumlah: number;
   deskripsi: string | null;
   tanggal: string | Date;
   tipe: string; // 'pemasukan' atau 'pengeluaran'
-  kategoriId: number | null;
-  tabunganId: number | null;
+  kategoriId: string | null;
+  tabunganId: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
 }
 
 interface TabunganData {
-  id: number;
+  id: string;
   nama: string;
   saldoAwal: number;
   jumlah: number;
@@ -175,14 +175,14 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
   };
 
   // Get nama tabungan dari tabunganId
-  const getTabunganNama = (tabunganId: number | null) => {
+  const getTabunganNama = (tabunganId: string | null) => {
     if (!tabunganId) return 'Tidak diketahui';
     const tab = tabungan.find(t => t.id === tabunganId);
     return tab ? tab.nama : 'Tabungan dihapus';
   };
 
   // Get kategori dari nama tabungan
-  const getTabunganKategori = (tabunganId: number | null) => {
+  const getTabunganKategori = (tabunganId: string | null) => {
     if (!tabunganId) return 'lainnya';
     const tab = tabungan.find(t => t.id === tabunganId);
     return tab ? getKategoriFromNama(tab.nama) : 'lainnya';
@@ -219,7 +219,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     }).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
   }, [transaksi, searchTerm, filterTabungan, filterJenis, filterBulan]);
 
-  const handleDeleteTransaksi = async (id: number) => {
+  const handleDeleteTransaksi = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) {
       try {
         const response = await fetch(`/api/transactions?XTransformPort=3000`, {

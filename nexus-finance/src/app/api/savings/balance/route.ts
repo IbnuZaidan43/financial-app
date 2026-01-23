@@ -7,9 +7,13 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, jumlah } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    }
     
     const tabungan = await db.tabungan.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: { jumlah: parseFloat(jumlah) }
     })
     

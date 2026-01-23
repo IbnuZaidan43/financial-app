@@ -4,14 +4,13 @@ import {
   Monitor, 
   Smartphone, 
   Globe, 
-  Chrome, 
-  Safari, 
-  Edge, 
-  Firefox,
-  Apple,
-  Android,
-  Windows,
-  Package
+  Compass, // Pengganti Safari
+  Laptop,  // Pengganti Windows/Mac
+  Tablet,
+  Package,
+  Info,
+  Layers,
+  Cpu
 } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
 import { Badge } from '@/components/ui/badge';
@@ -47,40 +46,17 @@ export default function PlatformBadge({
   } = usePWA();
 
   const getPlatformIcon = () => {
-    switch (platform.toLowerCase()) {
-      case 'ios':
-      case 'iphone':
-      case 'ipad':
-        return <Apple className="w-4 h-4" />;
-      case 'android':
-        return <Android className="w-4 h-4" />;
-      case 'windows':
-        return <Windows className="w-4 h-4" />;
-      case 'mac':
-      case 'macos':
-        return <Apple className="w-4 h-4" />;
-      case 'linux':
-        return <Monitor className="w-4 h-4" />;
-      case 'pwa':
-        return <Smartphone className="w-4 h-4" />;
-      default:
-        return <Monitor className="w-4 h-4" />;
-    }
+    const p = platform.toLowerCase();
+    if (p.includes('ios') || p.includes('android')) return <Smartphone className="w-4 h-4" />;
+    if (p.includes('mac') || p.includes('windows') || p.includes('linux')) return <Monitor className="w-4 h-4" />;
+    if (p.includes('pwa')) return <Package className="w-4 h-4" />;
+    return <Cpu className="w-4 h-4" />;
   };
 
   const getBrowserIcon = () => {
-    switch (browser.toLowerCase()) {
-      case 'chrome':
-        return <Chrome className="w-4 h-4" />;
-      case 'safari':
-        return <Safari className="w-4 h-4" />;
-      case 'edge':
-        return <Edge className="w-4 h-4" />;
-      case 'firefox':
-        return <Firefox className="w-4 h-4" />;
-      default:
-        return <Globe className="w-4 h-4" />;
-    }
+    const b = browser.toLowerCase();
+    if (b.includes('safari')) return <Compass className="w-4 h-4" />;
+    return <Globe className="w-4 h-4" />; // Chrome, Edge, Firefox menggunakan Globe
   };
 
   const getPlatformColor = () => {

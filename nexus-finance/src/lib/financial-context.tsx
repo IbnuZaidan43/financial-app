@@ -1,14 +1,14 @@
 'use client';
 
+import { useSession } from 'next-auth/react';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { syncTransaksiToCloud, syncTabunganToCloud } from '@/app/actions';
 import * as XLSX from 'xlsx';
 
-// Interface untuk data dari API (mungkin berbeda dari Prisma types)
 interface TabunganData {
-  id: number;
+  id: string;
   nama: string;
   saldoAwal: number;
   jumlah: number;
@@ -17,14 +17,14 @@ interface TabunganData {
 }
 
 interface TransaksiData {
-  id: number;
+  id: string;
   judul: string;
   jumlah: number;
   deskripsi: string | null;
   tanggal: string | Date;
   tipe: string;
-  kategoriId: number | null;
-  tabunganId: number | null;
+  kategoriId: string | null;
+  tabunganId: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
 }
@@ -37,7 +37,7 @@ interface FinancialContextType {
   transaksi: TransaksiData[];
   refreshTabungan: () => Promise<void>;
   refreshTransaksi: () => Promise<void>;
-  updateTabunganBalance: (id: number, newBalance: number) => void;
+  updateTabunganBalance: (id: string, newBalance: number) => void;
   userId: string;
   createTabungan: (data: { nama: string; saldoAwal: number }) => Promise<any>;
   createTransaksi: (data: {
@@ -46,8 +46,8 @@ interface FinancialContextType {
     deskripsi?: string;
     tanggal: string;
     tipe: string;
-    kategoriId?: number;
-    tabunganId?: number;
+    kategoriId?: string;
+    tabunganId?: string;
   }) => Promise<any>;
   dataSource: DataSource;
   isOnline: boolean;
@@ -77,6 +77,7 @@ const getUserId = () => {
 export function FinancialProvider({ children }: { children: ReactNode }) {
   const [tabungan, setTabungan] = useState<TabunganData[]>([]);
   const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
+  const { data: session, status } = useSession();
   const [userId, setUserId] = useState<string>('default_user');
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -115,10 +116,42 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const currentUserId = getUserId();
-    setUserId(currentUserId);
-    console.log('👤 FinancialProvider initialized with userId:', currentUserId);
-  }, []);
+    const handleIdentityAndMigration = async () => {
+      if (status === 'authenticated' && session?.user?.id) {
+        const currentId = session.user.id;
+        const anonId = localStorage.getItem('financeUserId');
+
+        if (anonId && anonId !== currentId && anonId !== 'default_user') {
+          console.log('🔄 Mendeteksi data anonim, memulai migrasi ke akun...');
+          try {
+            const oldTabungan = localStorage.getItem(`finance_data_tabungan_${anonId}`);
+            const oldTransaksi = localStorage.getItem(`finance_data_transaksi_${anonId}`);
+            
+            if (oldTabungan || oldTransaksi) {
+              const tabunganData = JSON.parse(oldTabungan || '[]');
+              const transaksiData = JSON.parse(oldTransaksi || '[]');
+
+              // Sinkronkan data lama ke cloud dengan ID user baru
+              for (const tab of tabunganData) await syncTabunganToCloud(currentId, tab);
+              for (const trx of transaksiData) await syncTransaksiToCloud(currentId, trx);
+
+              setTabungan(tabunganData);
+              setTransaksi(transaksiData);
+              localStorage.removeItem('financeUserId'); // Bersihkan tanda anonim
+              console.log('✅ Migrasi sukses!');
+            }
+          } catch (err) {
+            console.error('❌ Migrasi gagal:', err);
+          }
+        }
+        setUserId(currentId);
+      } else if (status === 'unauthenticated') {
+        setUserId(getUserId());
+      }
+    };
+
+    handleIdentityAndMigration();
+  }, [session, status]);
 
   useEffect(() => {
     if (userId !== 'default_user') {
@@ -159,7 +192,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateTabunganBalance = (id: number, newBalance: number) => {
+  const updateTabunganBalance = (id: string, newBalance: number) => {
     const target = tabungan.find(t => t.id === id);
     if (!target) return;
 
@@ -180,7 +213,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
   const createTabungan = async (data: { nama: string; saldoAwal: number }) => {
     const newTabungan: TabunganData = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       nama: data.nama,
       saldoAwal: data.saldoAwal,
       jumlah: data.saldoAwal,
@@ -208,11 +241,11 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     deskripsi?: string;
     tanggal: string;
     tipe: string;
-    kategoriId?: number;
-    tabunganId?: number;
+    kategoriId?: string;
+    tabunganId?: string;
   }) => {
     const newTransaksi: TransaksiData = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       judul: data.judul,
       jumlah: data.jumlah,
       deskripsi: data.deskripsi || null,
@@ -277,14 +310,14 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-  const handleOnline = () => {
-    console.log('🌐 Internet terdeteksi aktif! Menjalankan sinkronisasi otomatis...');
-    forceSync(); 
-  };
+    const handleOnline = () => {
+      console.log('🌐 Internet terdeteksi aktif! Menjalankan sinkronisasi otomatis...');
+      forceSync(); 
+    };
 
-  window.addEventListener('online', handleOnline);
-  return () => window.removeEventListener('online', handleOnline);
-}, [forceSync]);
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [forceSync]);
 
   const exportData = async (type: 'transactions' | 'savings') => {
   try {
@@ -339,7 +372,7 @@ const importData = async (file: File) => {
         for (const row of jsonData as any[]) {
           if (row.Tanggal && row.Jumlah && row.Tipe) {
             const newTransaction: TransaksiData = {
-              id: Math.floor(Date.now() + Math.random()),
+              id: crypto.randomUUID(),
               judul: row.Judul || 'Transaksi Import',
               jumlah: parseFloat(row.Jumlah),
               deskripsi: row.Keterangan || null,
