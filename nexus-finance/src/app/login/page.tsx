@@ -18,10 +18,10 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    if (status === "authenticated") {
-      router.push("/");
-    }
-  }, [status, router]);
+  if (status === "authenticated") {
+    window.location.href = "/";
+  }
+}, [status]);
 
   if (status === "loading") {
     return (
