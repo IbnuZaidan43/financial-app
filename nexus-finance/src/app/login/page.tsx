@@ -9,7 +9,7 @@ import { Globe, UserCircle } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
   const handleGuestLogin = () => {
     document.cookie = "guest-mode=true; path=/; max-age=86400";
@@ -18,10 +18,15 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-  if (status === "authenticated") {
-    window.location.href = "/";
-  }
-}, [status]);
+    if (status === "authenticated" && session?.user?.id) {
+      const hasAnonData = localStorage.getItem('financeUserId');
+      
+      if (!hasAnonData) {
+        console.log("🚀 Sesi stabil, mengalihkan ke Dashboard...");
+        router.replace("/");
+      }
+    }
+  }, [status, session, router]);
 
   if (status === "loading") {
     return (

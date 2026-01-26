@@ -115,53 +115,61 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const [isMigrating, setIsMigrating] = useState(false);
   useEffect(() => {
-  const handleIdentityAndMigration = async () => {
-    if (status === 'authenticated' && session?.user?.id) {
-      const currentId = session.user.id;
-      const anonId = localStorage.getItem('financeUserId');
+    const handleIdentityAndMigration = async () => {
+      if (status === 'authenticated' && session?.user?.id) {
+        const currentId = session.user.id;
+        const anonId = localStorage.getItem('financeUserId');
 
-      // Jika ada ID anonim dan berbeda dengan ID user login sekarang
-      if (anonId && anonId !== currentId && anonId !== 'default_user') {
-        console.log('🔄 Mendeteksi data anonim, memulai migrasi ke akun...');
-        
-        try {
-          const tabKey = `finance_data_tabungan_${anonId}`;
-          const trxKey = `finance_data_transaksi_${anonId}`;
+        if (anonId && anonId !== currentId && anonId !== 'default_user' && !isMigrating) {
+          setIsMigrating(true);
+          console.log('🔄 Mendeteksi data anonim, memulai migrasi...');
           
-          const oldTabungan = localStorage.getItem(tabKey);
-          const oldTransaksi = localStorage.getItem(trxKey);
-          
-          if (oldTabungan || oldTransaksi) {
-            const tabunganData = JSON.parse(oldTabungan || '[]');
-            const transaksiData = JSON.parse(oldTransaksi || '[]');
+          try {
+            const tabKey = `finance_data_tabungan_${anonId}`;
+            const trxKey = `finance_data_transaksi_${anonId}`;
+            
+            const oldTabungan = localStorage.getItem(tabKey);
+            const oldTransaksi = localStorage.getItem(trxKey);
+            
+            if (oldTabungan || oldTransaksi) {
+              const tabunganData = JSON.parse(oldTabungan || '[]');
+              const transaksiData = JSON.parse(oldTransaksi || '[]');
 
-            await Promise.all([
-              ...tabunganData.map((tab: any) => syncTabunganToCloud(currentId, tab)),
-              ...transaksiData.map((trx: any) => syncTransaksiToCloud(currentId, trx))
-            ]);
+              await Promise.all([
+                ...tabunganData.map((tab: any) => syncTabunganToCloud(currentId, tab)),
+                ...transaksiData.map((trx: any) => syncTransaksiToCloud(currentId, trx))
+              ]);
+              
+              localStorage.removeItem(tabKey);
+              localStorage.removeItem(trxKey);
+              console.log('✅ Data berhasil dikirim ke Cloud');
+            }
 
             localStorage.removeItem('financeUserId');
-            localStorage.removeItem(tabKey);
-            localStorage.removeItem(trxKey);
             document.cookie = "guest-mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-
-            console.log('✅ Migrasi sukses!');
             
-            window.location.href = "/"; 
+            console.log('✅ Migrasi tuntas, menyegarkan sesi...');
+            window.location.href = "/";
+            
+          } catch (err) {
+            console.error('❌ Migrasi gagal:', err);
+            setIsMigrating(false);
           }
-        } catch (err) {
-          console.error('❌ Migrasi gagal:', err);
+        } else {
+          if (userId !== currentId) {
+            setUserId(currentId);
+          }
         }
+      } else if (status === 'unauthenticated') {
+        const id = getUserId();
+        if (userId !== id) setUserId(id);
       }
-      setUserId(currentId);
-    } else if (status === 'unauthenticated') {
-      setUserId(getUserId());
-    }
-  };
+    };
 
-  handleIdentityAndMigration();
-}, [session, status]);
+    handleIdentityAndMigration();
+  }, [status, session?.user?.id, isMigrating]);
 
   useEffect(() => {
     if (userId !== 'default_user') {
