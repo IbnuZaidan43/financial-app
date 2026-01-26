@@ -557,20 +557,24 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// Enhanced Fetch Service Worker with advanced cache strategies
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Handle different request types with appropriate strategies
+  if (url.pathname.startsWith('/api/auth')) {
+    return;
+  }
+
+  if (url.pathname.includes('app-icons') || url.pathname.includes('manifest.json')) {
+    return;
+  }
+
   if (url.pathname.startsWith('/api/')) {
-    // API requests with Network First strategy
     event.respondWith(handleApiRequest(request));
     return;
   }
 
   if (isCriticalAsset(request.url)) {
-    // Critical assets with Cache First strategy
     event.respondWith(handleCriticalAsset(request));
     return;
   }
@@ -579,18 +583,15 @@ self.addEventListener('fetch', (event) => {
       request.destination === 'style' || 
       request.destination === 'image' ||
       request.destination === 'font') {
-    // Static assets with Cache First strategy
     event.respondWith(handleStaticAsset(request));
     return;
   }
 
   if (request.mode === 'navigate') {
-    // Navigation with Network First, fallback to cache
     event.respondWith(handleNavigationRequest(request));
     return;
   }
 
-  // Default: Stale While Revalidate
   event.respondWith(handleStaleWhileRevalidate(request));
 });
 
