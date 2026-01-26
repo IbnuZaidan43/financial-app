@@ -6,6 +6,10 @@ import Google from "next-auth/providers/google"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  debug: true,
+  session: {
+    strategy: "jwt",
+  },
   providers: [
     GitHub({
       clientId: process.env.AUTH_GITHUB_ID,
@@ -17,14 +21,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token.id) {
+        session.user.id = token.id as string;
       }
       return session;
     },
   },
   pages: {
     signIn: '/login',
-  }
+  },
+  trustHost: true, 
 })
