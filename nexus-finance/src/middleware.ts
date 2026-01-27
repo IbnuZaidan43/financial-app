@@ -1,28 +1,23 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { auth } from "@/lib/auth"
+import { NextResponse } from "next/server"
 
-export async function middleware(request: NextRequest) {
-  const session = await getToken({ 
-    req: request, 
-    secret: process.env.AUTH_SECRET 
-  });
+export default auth((req) => {
+  const { nextUrl } = req;
+  const isLoggedIn = !!req.auth;
+  const isGuestMode = req.cookies.get('guest-mode')?.value === 'true';
+  const isLoginPage = nextUrl.pathname === '/login';
 
-  const { pathname } = request.nextUrl;
-  const isGuestMode = request.cookies.get('guest-mode')?.value === 'true';
-  const isLoginPage = pathname === '/login';
-
-  if (isLoginPage && (session || isGuestMode)) {
-    return NextResponse.redirect(new URL('/', request.url));
+  if (isLoginPage && (isLoggedIn || isGuestMode)) {
+    return NextResponse.redirect(new URL('/', nextUrl));
   }
 
-  if (!isLoginPage && !session && !isGuestMode) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  if (!isLoginPage && !isLoggedIn && !isGuestMode) {
+    return NextResponse.redirect(new URL('/login', nextUrl));
   }
 
   return NextResponse.next();
-}
+})
 
 export const config = {
-  matcher: ['/((?!api/auth|_next/static|_next/image|sw.js|favicon.ico|manifest.json|app-icons|screenshots).*)',],
+  matcher: ['/((?!api/auth|_next/static|_next/image|sw.js|favicon.ico|manifest.json|app-icons|screenshots).*)'],
 };

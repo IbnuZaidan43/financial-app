@@ -561,11 +561,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  if (request.mode === 'navigate' || url.pathname.startsWith('/api/auth')) {
-    return; 
+  if (request.mode === 'navigate' || 
+      url.pathname.startsWith('/api/auth') || 
+      url.pathname.includes('callback')) {
+    return;
   }
 
-  if (url.pathname.includes('app-icons') || url.pathname.includes('manifest.json')) {
+  if (url.pathname.includes('manifest.json') || url.pathname.includes('app-icons')) {
     return;
   }
 
@@ -584,11 +586,6 @@ self.addEventListener('fetch', (event) => {
       request.destination === 'image' ||
       request.destination === 'font') {
     event.respondWith(handleStaticAsset(request));
-    return;
-  }
-
-  if (request.mode === 'navigate') {
-    event.respondWith(handleNavigationRequest(request));
     return;
   }
 
