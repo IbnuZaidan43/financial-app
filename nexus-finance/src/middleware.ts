@@ -1,5 +1,8 @@
-import { auth } from "@/lib/auth"
-import { NextResponse } from "next/server"
+import NextAuth from "next-auth";
+import authConfig from "@/auth.config";
+import { NextResponse } from "next/server";
+
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -16,7 +19,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-})
+});
 
 export const config = {
   matcher: ['/((?!api/auth|_next/static|_next/image|sw.js|favicon.ico|manifest.json|app-icons|screenshots).*)'],
