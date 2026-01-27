@@ -561,8 +561,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  if (url.pathname.startsWith('/api/auth')) {
-    return;
+  if (request.mode === 'navigate' || url.pathname.startsWith('/api/auth')) {
+    return; 
   }
 
   if (url.pathname.includes('app-icons') || url.pathname.includes('manifest.json')) {
