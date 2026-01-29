@@ -561,6 +561,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  if ( request.headers.get('Next-Action') || request.method === 'POST' || 
+    url.pathname.startsWith('/api/auth') || request.mode === 'navigate') {
+    return;
+  }
+
   if (request.mode === 'navigate' || 
       url.pathname.startsWith('/api/auth') || 
       url.pathname.includes('callback')) {

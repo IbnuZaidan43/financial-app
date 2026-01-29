@@ -29,9 +29,13 @@ export async function getFinancialData(userId: string) {
         orderBy: { tanggal: 'desc' }
       })
     ]);
-    return { tabungan, transaksi };
+
+    return { 
+      tabungan: JSON.parse(JSON.stringify(tabungan)), 
+      transaksi: JSON.parse(JSON.stringify(transaksi)) 
+    };
   } catch (error) {
     console.error("Gagal mengambil data dari Cloud:", error);
-    return { tabungan: [], transaksi: [] };
+    throw new Error("Gagal memuat data dari server");
   }
 }

@@ -172,19 +172,23 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   }, [status, session?.user?.id, isMigrating]);
 
   const fetchFromCloud = async (id: string) => {
-    if (!navigator.onLine || id === 'default_user') return;
+    if (!navigator.onLine || id === 'default_user') {
+      setSyncStatus('offline');
+      return;
+    }
     
     setSyncStatus('syncing');
     try {
       const cloudData = await getFinancialData(id);
       
-      setTabungan(cloudData.tabungan as TabunganData[]);
-      setTransaksi(cloudData.transaksi as TransaksiData[]);
-      updateData(cloudData.tabungan, cloudData.transaksi);
-      
-      setSyncStatus('synced');
-      setLastSync(new Date());
-      console.log('☁️ Data sinkron dari Cloud!');
+      if (cloudData) {
+        setTabungan(cloudData.tabungan);
+        setTransaksi(cloudData.transaksi);
+        updateData(cloudData.tabungan, cloudData.transaksi);
+        
+        setSyncStatus('synced');
+        setLastSync(new Date());
+      }
     } catch (error) {
       console.error('❌ Gagal fetch dari cloud:', error);
       setSyncStatus('error');
