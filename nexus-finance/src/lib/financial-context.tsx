@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { syncTransaksiToCloud, syncTabunganToCloud } from '@/app/actions';
+import { syncTransaksiToCloud, syncTabunganToCloud, getFinancialData } from '@/app/actions';
 import * as XLSX from 'xlsx';
 
 interface TabunganData {
@@ -171,21 +171,41 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     handleIdentityAndMigration();
   }, [status, session?.user?.id, isMigrating]);
 
+  const fetchFromCloud = async (id: string) => {
+    if (!navigator.onLine || id === 'default_user') return;
+    
+    setSyncStatus('syncing');
+    try {
+      const cloudData = await getFinancialData(id);
+      
+      setTabungan(cloudData.tabungan as TabunganData[]);
+      setTransaksi(cloudData.transaksi as TransaksiData[]);
+      updateData(cloudData.tabungan, cloudData.transaksi);
+      
+      setSyncStatus('synced');
+      setLastSync(new Date());
+      console.log('☁️ Data sinkron dari Cloud!');
+    } catch (error) {
+      console.error('❌ Gagal fetch dari cloud:', error);
+      setSyncStatus('error');
+    }
+  };
+
   useEffect(() => {
     if (userId !== 'default_user') {
-      console.log('🚀 FinancialProvider mounted, loading initial data for userId:', userId);
-      loadFromLocal().then(() => {
-        console.log('📱 Local data loaded');
+      const initData = async () => {
+        await loadFromLocal();
         setTabungan(localTabungan);
         setTransaksi(localTransaksi);
-        setLastSync(new Date());
 
-        if (navigator.onLine) {
-          forceSync();
+        if (status === 'authenticated') {
+          await fetchFromCloud(userId);
         }
-      });
+      };
+
+      initData();
     }
-  }, [userId]);
+  }, [userId, status]);
 
   const refreshTabungan = async () => {
     console.log('🔄 Refreshing tabungan from local storage...');
