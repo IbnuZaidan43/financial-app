@@ -50,6 +50,8 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     lastSync, 
     forceSync,
     createTabungan,
+    updateTabungan,
+    deleteTabungan,
     tabungan
   } = useFinancial();
 
@@ -164,7 +166,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     setEditingTabungan(null);
   };
 
-  // NEW: Enhanced submit with local storage support
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -174,20 +175,14 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
 
     try {
-      // Use createTabungan from financial context for offline support
       const tabunganData = {
         nama: formData.nama,
         saldoAwal: parseFloat(formData.saldoAwal.replace(/\./g, '') || '0')
       };
-      const result = await createTabungan(tabunganData);
 
+      await createTabungan(tabunganData);
       setShowAddDialog(false);
-      setShowEditDialog(false);
-      setEditingTabungan(null);
       resetForm();
-      
-      // Refresh parent data
-      await onDataUpdate();
       
       alert('Tabungan berhasil disimpan');
     } catch (error) {
@@ -214,30 +209,15 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
 
     try {
-      console.log('🔄 Updating tabungan...');
-      const response = await fetch(`/api/savings/${editingTabungan.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: editingTabungan.id,
-          nama: formData.nama,
-          saldoAwal: parseFloat(formData.saldoAwal.replace(/\./g, '')) || 0
-        }),
+      await updateTabungan(editingTabungan.id, {
+        nama: formData.nama,
+        saldoAwal: parseFloat(formData.saldoAwal.replace(/\./g, '')) || 0
       });
 
-      if (response.ok) {
-        console.log('✅ Tabungan updated');
-        setShowEditDialog(false);
-        resetAllForm();
-        await onDataUpdate();
-        alert('Tabungan berhasil diupdate');
-      } else {
-        throw new Error('Gagal mengupdate tabungan');
-      }
+      setShowEditDialog(false);
+      resetAllForm();
+      alert('Tabungan berhasil diperbarui');
     } catch (error) {
-      console.error('Error updating tabungan:', error);
       alert('Gagal mengupdate tabungan');
     }
   };
@@ -245,20 +225,9 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
   const handleDelete = async (id: string, nama: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus tabungan "${nama}"?`)) {
       try {
-        console.log('🔄 Deleting tabungan:', { id, nama });
-        const response = await fetch(`/api/savings/${id}`, {
-          method: 'DELETE',
-        });
-
-        if (response.ok) {
-          console.log('✅ Tabungan deleted');
-          await onDataUpdate();
-          alert('Tabungan berhasil dihapus');
-        } else {
-          throw new Error('Gagal menghapus tabungan');
-        }
+        await deleteTabungan(id);
+        alert('Tabungan berhasil dihapus');
       } catch (error) {
-        console.error('Error deleting tabungan:', error);
         alert('Gagal menghapus tabungan');
       }
     }
@@ -266,7 +235,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
 
   const totalSaldo = tabungan.reduce((total, t) => total + t.jumlah, 0);
 
-  // Group tabungan by kategori
   const tabunganByKategori = tabungan.reduce((acc, t) => {
     const kategori = getKategoriFromNama(t.nama);
     if (!acc[kategori]) acc[kategori] = [];

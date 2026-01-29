@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { syncTransaksiToCloud, syncTabunganToCloud, getFinancialData } from '@/app/actions';
+import { syncTransaksiToCloud, syncTabunganToCloud, getFinancialData, deleteTabunganFromCloud, deleteTransaksiFromCloud } from '@/app/actions';
 import * as XLSX from 'xlsx';
 
 interface TabunganData {
@@ -56,6 +56,9 @@ interface FinancialContextType {
   forceSync: () => Promise<void>;
   exportData: (type: 'transactions' | 'savings') => Promise<void>;
   importData: (file: File) => Promise<any>;
+  updateTabungan: (id: string, data: { nama: string; saldoAwal: number }) => Promise<void>;
+  deleteTabungan: (id: string) => Promise<void>;
+  deleteTransaksi: (id: string) => Promise<void>;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
@@ -263,16 +266,52 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date()
     };
     
-    const updatedTabunganList = [...tabungan, newTabungan];
-    setTabungan(updatedTabunganList);
+    setTabungan((prev) => [...prev, newTabungan]);
     
     try {
-      await updateData(updatedTabunganList, transaksi);
-      setLastSync(new Date());
-      syncToCloud('tabungan', newTabungan);
+      await updateData([...tabungan, newTabungan], transaksi);
+      await syncToCloud('tabungan', newTabungan);
+
       return newTabungan;
     } catch (error) {
-      setTabungan(tabungan);
+      refreshTabungan();
+      throw error;
+    }
+  };
+
+  const updateTabungan = async (id: string, data: { nama: string; saldoAwal: number }) => {
+    const oldData = [...tabungan];
+
+    setTabungan((prev) => 
+      prev.map((t) => t.id === id ? { 
+        ...t, nama: data.nama, saldoAwal: data.saldoAwal, jumlah: data.saldoAwal,updatedAt: new Date() 
+      } : t)
+    );
+
+    try {
+      const updatedObj = { id, ...data, jumlah: data.saldoAwal, updatedAt: new Date() };
+      await updateData(tabungan.map(t => t.id === id ? (updatedObj as any) : t), transaksi);
+      await syncToCloud('tabungan', updatedObj);
+      
+      if (status === 'authenticated') await fetchFromCloud(userId);
+    } catch (error) {
+      setTabungan(oldData);
+      throw error;
+    }
+  };
+
+  const deleteTabungan = async (id: string) => {
+    const oldData = [...tabungan];
+    setTabungan((prev) => prev.filter((t) => t.id !== id));
+
+    try {
+      await updateData(tabungan.filter(t => t.id !== id), transaksi);
+      if (status === 'authenticated') {
+        await deleteTabunganFromCloud(userId, id);
+        await fetchFromCloud(userId);
+      }
+    } catch (error) {
+      setTabungan(oldData);
       throw error;
     }
   };
@@ -299,37 +338,80 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date()
     };
 
-    let affectedTabungan: TabunganData | null = null;
-    let updatedTabunganList: TabunganData[] = [...tabungan];
+    let updatedTabList: TabunganData[] = [...tabungan];
+    let affectedTab: TabunganData | null = null;
+
+    setTransaksi((prev) => [newTransaksi, ...prev]);
 
     if (data.tabunganId) {
-      updatedTabunganList = tabungan.map((t): TabunganData => {
-        if (t.id === data.tabunganId) {
-          const change = data.tipe === 'pengeluaran' ? -data.jumlah : data.jumlah;
-          const updatedObj = { ...t, jumlah: t.jumlah + change, updatedAt: new Date() };
-          affectedTabungan = updatedObj;
-          return updatedObj;
+      setTabungan((prev) => 
+        prev.map((t) => {
+          if (t.id === data.tabunganId) {
+            const change = data.tipe === 'pengeluaran' ? -data.jumlah : data.jumlah;
+            const updated = { ...t, jumlah: t.jumlah + change, updatedAt: new Date() };
+            affectedTab = updated;
+            return updated;
+          }
+          return t;
+        })
+      );
+      updatedTabList = tabungan.map(t => t.id === data.tabunganId ? affectedTab! : t);
+    }
+    
+    try {
+      await updateData(updatedTabList, [newTransaksi, ...transaksi]);
+      await syncToCloud('transaksi', newTransaksi);
+      if (affectedTab) await syncToCloud('tabungan', affectedTab);
+        
+      return newTransaksi;
+    } catch (error) {
+      refreshTabungan();
+      refreshTransaksi();
+      throw error;
+    }
+  };
+
+  const deleteTransaksi = async (id: string) => {
+    const transactionToDelete = transaksi.find((t) => t.id === id);
+    if (!transactionToDelete) return;
+
+    const originalTransactions = [...transaksi];
+    const originalSavings = [...tabungan];
+
+    setTransaksi((prev) => prev.filter((t) => t.id !== id));
+
+    let affectedTab: TabunganData | null = null;
+    let newTabunganList = [...tabungan];
+
+    if (transactionToDelete.tabunganId) {
+      newTabunganList = tabungan.map((t) => {
+        if (t.id === transactionToDelete.tabunganId) {
+          // Logika Reversal (Kebalikan)
+          const amountChange = transactionToDelete.tipe === 'pemasukan' 
+            ? -transactionToDelete.jumlah
+            : transactionToDelete.jumlah;
+
+          const updated = { ...t, jumlah: t.jumlah + amountChange, updatedAt: new Date() };
+          affectedTab = updated;
+          return updated;
         }
         return t;
       });
+      setTabungan(newTabunganList);
     }
 
-    const updatedTransaksiList = [newTransaksi, ...transaksi];
-    setTransaksi(updatedTransaksiList);
-    setTabungan(updatedTabunganList);
-    
     try {
-      await updateData(updatedTabunganList, updatedTransaksiList);
-      setLastSync(new Date());
-      syncToCloud('transaksi', newTransaksi);
-      if (affectedTabungan) {
-        syncToCloud('tabungan', affectedTabungan);
+      await updateData(newTabunganList, originalTransactions.filter(t => t.id !== id));
+
+      if (status === 'authenticated') {
+        await deleteTransaksiFromCloud(userId, id);
+        if (affectedTab) await syncTabunganToCloud(userId, affectedTab);
+        await fetchFromCloud(userId);
       }
-      
-      return newTransaksi;
     } catch (error) {
-      setTransaksi(transaksi);
-      setTabungan(tabungan);
+      setTransaksi(originalTransactions);
+      setTabungan(originalSavings);
+      console.error("Gagal menghapus transaksi:", error);
       throw error;
     }
   };
@@ -466,7 +548,10 @@ const importData = async (file: File) => {
       lastSync,
       forceSync,
       exportData,
-      importData
+      importData,
+      updateTabungan,
+      deleteTabungan,
+      deleteTransaksi
     }}>
       {children}
     </FinancialContext.Provider>

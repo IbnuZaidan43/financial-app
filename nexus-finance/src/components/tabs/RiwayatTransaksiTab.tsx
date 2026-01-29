@@ -62,7 +62,8 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     isOnline,
     syncStatus, 
     lastSync, 
-    forceSync 
+    forceSync,
+    deleteTransaksi
   } = useFinancial();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -219,28 +220,15 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     }).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
   }, [transaksi, searchTerm, filterTabungan, filterJenis, filterBulan]);
 
-  const handleDeleteTransaksi = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) {
-      try {
-        const response = await fetch(`/api/transactions?XTransformPort=3000`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ id }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to delete transaction');
-        }
-
-        onDataUpdate();
-      } catch (error) {
-        console.error('Error deleting transaksi:', error);
-        alert('Gagal menghapus transaksi');
-      }
+  const handleDelete = async (id: string) => {
+  if (confirm("Hapus transaksi ini? Saldo tabungan akan otomatis disesuaikan.")) {
+    try {
+      await deleteTransaksi(id);
+    } catch (error) {
+      alert("Gagal menghapus transaksi");
     }
-  };
+  }
+};
 
   return (
     <div className="space-y-6">
@@ -454,7 +442,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteTransaksi(t.id!)}
+                        onClick={() => handleDelete(t.id!)}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="h-4 w-4" />

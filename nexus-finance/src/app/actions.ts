@@ -39,3 +39,25 @@ export async function getFinancialData(userId: string) {
     throw new Error("Gagal memuat data dari server");
   }
 }
+
+export async function deleteTabunganFromCloud(userId: string, id: string) {
+  try {
+    return await prisma.tabungan.delete({
+      where: { id, userId }
+    });
+  } catch (error) {
+    console.error("Gagal menghapus di Cloud:", error);
+    throw error;
+  }
+}
+
+export async function deleteTransaksiFromCloud(userId: string, id: string) {
+  try {
+    return await prisma.transaksi.delete({
+      where: { id, userId }
+    });
+  } catch (error) {
+    console.error("Gagal menghapus transaksi di Cloud:", error);
+    throw error;
+  }
+}
