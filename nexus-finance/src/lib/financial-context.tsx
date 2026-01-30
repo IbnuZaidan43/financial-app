@@ -376,7 +376,8 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     const originalTransactions = [...transaksi];
     const originalSavings = [...tabungan];
 
-    setTransaksi((prev) => prev.filter((t) => t.id !== id));
+    const updatedTransactions = originalTransactions.filter((t) => t.id !== id);
+    setTransaksi(updatedTransactions);
 
     let affectedTab: TabunganData | null = null;
     let newTabunganList = [...tabungan];
@@ -387,7 +388,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
           const amountChange = transactionToDelete.tipe === 'pemasukan' 
             ? -transactionToDelete.jumlah
             : transactionToDelete.jumlah;
-
+          
           const updated = { ...t, jumlah: t.jumlah + amountChange, updatedAt: new Date() };
           affectedTab = updated;
           return updated;
@@ -398,17 +399,20 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await updateData(newTabunganList, originalTransactions.filter(t => t.id !== id));
-
+      await updateData(newTabunganList, updatedTransactions);
       if (status === 'authenticated') {
+        console.log('🗑️ Menghapus transaksi di cloud...');
         await deleteTransaksiFromCloud(userId, id);
-        if (affectedTab) await syncTabunganToCloud(userId, affectedTab);
-        await fetchFromCloud(userId);
+        if (affectedTab) {
+          await syncTabunganToCloud(userId, affectedTab);
+        }
       }
+      
+      console.log('✅ Transaksi berhasil dihapus dan saldo disesuaikan');
     } catch (error) {
       setTransaksi(originalTransactions);
       setTabungan(originalSavings);
-      console.error("Gagal menghapus transaksi:", error);
+      console.error("❌ Gagal menghapus transaksi:", error);
       throw error;
     }
   };
