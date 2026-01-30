@@ -1,9 +1,3 @@
-/**
- * Cache Monitoring & Analytics System
- * 
- * Comprehensive cache performance monitoring, analytics, and optimization suggestions
- */
-
 export interface CacheMetrics {
   totalSize: number;
   totalEntries: number;
@@ -69,7 +63,7 @@ export interface CacheAnalyticsConfig {
   enablePerformanceTracking: boolean;
   enableStorageOptimization: boolean;
   enableRecommendations: boolean;
-  monitoringInterval: number; // in milliseconds
+  monitoringInterval: number;
   historyRetentionDays: number;
   alertThresholds: {
     lowHitRate: number;
@@ -94,7 +88,7 @@ class CacheAnalyticsManager {
       enablePerformanceTracking: true,
       enableStorageOptimization: true,
       enableRecommendations: true,
-      monitoringInterval: 30000, // 30 seconds
+      monitoringInterval: 30000,
       historyRetentionDays: 7,
       alertThresholds: {
         lowHitRate: 0.7,
@@ -106,9 +100,6 @@ class CacheAnalyticsManager {
     };
   }
 
-  /**
-   * Start monitoring cache performance
-   */
   startMonitoring(): void {
     if (this.isMonitoring) return;
 
@@ -126,9 +117,6 @@ class CacheAnalyticsManager {
     this.collectMetrics();
   }
 
-  /**
-   * Stop monitoring cache performance
-   */
   stopMonitoring(): void {
     if (!this.isMonitoring) return;
 
@@ -141,9 +129,6 @@ class CacheAnalyticsManager {
     }
   }
 
-  /**
-   * Collect comprehensive cache metrics
-   */
   async collectMetrics(): Promise<void> {
     try {
       const metrics = await this.calculateMetrics();
@@ -160,9 +145,6 @@ class CacheAnalyticsManager {
     }
   }
 
-  /**
-   * Calculate cache metrics from all caches
-   */
   private async calculateMetrics(): Promise<CacheMetrics> {
     let totalSize = 0;
     let totalEntries = 0;
@@ -190,13 +172,11 @@ class CacheAnalyticsManager {
               const size = buffer.byteLength;
               
               totalSize += size;
-              
-              // Check if response is compressed
+            
               if (response.headers.get('content-encoding') === 'gzip') {
                 compressedEntries++;
               }
               
-              // Simulate metrics (in real implementation, these would be tracked)
               totalHits += Math.random() > 0.3 ? 1 : 0;
               totalRequests += 1;
               totalResponseTime += Math.random() * 100 + 50;
@@ -226,16 +206,12 @@ class CacheAnalyticsManager {
     };
   }
 
-  /**
-   * Check for performance alerts
-   */
   private checkAlerts(): void {
     const metrics = this.metrics.get('overall');
     if (!metrics) return;
 
     const newAlerts: CacheAlert[] = [];
 
-    // Check hit rate
     if (metrics.hitRate < this.config.alertThresholds.lowHitRate) {
       newAlerts.push({
         type: 'warning',
@@ -247,7 +223,6 @@ class CacheAnalyticsManager {
       });
     }
 
-    // Check storage usage (assuming 50MB max)
     const maxStorage = 50 * 1024 * 1024;
     const storageUsage = metrics.totalSize / maxStorage;
     if (storageUsage > this.config.alertThresholds.highStorageUsage) {
@@ -261,7 +236,6 @@ class CacheAnalyticsManager {
       });
     }
 
-    // Check response time
     if (metrics.averageResponseTime > this.config.alertThresholds.slowResponseTime) {
       newAlerts.push({
         type: 'warning',
@@ -272,29 +246,22 @@ class CacheAnalyticsManager {
         severity: 'low'
       });
     }
-
-    // Add new alerts
+    
     this.alerts.push(...newAlerts);
-
-    // Keep only recent alerts (last 100)
     this.alerts = this.alerts.slice(-100);
   }
 
-  /**
-   * Update historical trends
-   */
   private updateHistory(): void {
     const metrics = this.metrics.get('overall');
     if (!metrics) return;
 
     const timestamp = Date.now();
     
-    // Add trend data points
     this.history.push({
       metric: 'hitRate',
       value: metrics.hitRate,
       timestamp,
-      change: 0, // Would calculate from previous value
+      change: 0,
       changePercent: 0
     });
 
@@ -314,22 +281,16 @@ class CacheAnalyticsManager {
       changePercent: 0
     });
 
-    // Keep only data within retention period
     const retentionMs = this.config.historyRetentionDays * 24 * 60 * 60 * 1000;
     const cutoffTime = Date.now() - retentionMs;
     this.history = this.history.filter(trend => trend.timestamp > cutoffTime);
   }
 
-  /**
-   * Generate performance recommendations
-   */
   generateRecommendations(): CacheRecommendation[] {
     const recommendations: CacheRecommendation[] = [];
     const metrics = this.metrics.get('overall');
     
     if (!metrics) return recommendations;
-
-    // Hit rate recommendations
     if (metrics.hitRate < 0.7) {
       recommendations.push({
         type: 'performance',
@@ -342,7 +303,6 @@ class CacheAnalyticsManager {
       });
     }
 
-    // Storage usage recommendations
     const maxStorage = 50 * 1024 * 1024;
     const storageUsage = metrics.totalSize / maxStorage;
     if (storageUsage > 0.8) {
@@ -357,7 +317,6 @@ class CacheAnalyticsManager {
       });
     }
 
-    // Response time recommendations
     if (metrics.averageResponseTime > 200) {
       recommendations.push({
         type: 'optimization',
@@ -370,7 +329,6 @@ class CacheAnalyticsManager {
       });
     }
 
-    // Compression recommendations
     if (metrics.compressionRatio < 0.5) {
       recommendations.push({
         type: 'optimization',
@@ -386,9 +344,6 @@ class CacheAnalyticsManager {
     return recommendations;
   }
 
-  /**
-   * Get comprehensive performance report
-   */
   async generateReport(): Promise<CachePerformanceReport> {
     const metrics = this.metrics.get('overall');
     const entries = await this.getEntryMetrics();
@@ -415,9 +370,6 @@ class CacheAnalyticsManager {
     };
   }
 
-  /**
-   * Get detailed entry metrics
-   */
   private async getEntryMetrics(): Promise<CacheEntryMetrics[]> {
     const entries: CacheEntryMetrics[] = [];
     const now = Date.now();
@@ -441,7 +393,7 @@ class CacheAnalyticsManager {
                 url: request.url,
                 size,
                 accessCount: Math.floor(Math.random() * 100) + 1,
-                lastAccessed: now - Math.floor(Math.random() * 86400000), // Random last access
+                lastAccessed: now - Math.floor(Math.random() * 86400000),
                 age: now - (response.headers.get('date') ? new Date(response.headers.get('date')!).getTime() : now),
                 hits: Math.floor(Math.random() * 50) + 1,
                 misses: Math.floor(Math.random() * 10),
@@ -449,7 +401,7 @@ class CacheAnalyticsManager {
                 compressed: response.headers.get('content-encoding') === 'gzip',
                 expiresAt: now + (response.headers.get('cache-control') ? 
                   this.parseCacheControl(response.headers.get('cache-control')!) : 
-                  3600000) // Default 1 hour
+                  3600000)
               });
             }
           }
@@ -459,60 +411,42 @@ class CacheAnalyticsManager {
       console.warn('📊 Cache Analytics: Error getting entry metrics:', error);
     }
 
-    return entries.sort((a, b) => b.accessCount - a.accessCount).slice(0, 100); // Top 100 entries
+    return entries.sort((a, b) => b.accessCount - a.accessCount).slice(0, 100);
   }
 
-  /**
-   * Parse cache-control header to get max-age
-   */
   private parseCacheControl(cacheControl: string): number {
     const directives = cacheControl.split(',').map(d => d.trim());
     const maxAgeDirective = directives.find(d => d.startsWith('max-age='));
     
     if (maxAgeDirective) {
       const age = parseInt(maxAgeDirective.split('=')[1]);
-      return age * 1000; // Convert to milliseconds
+      return age * 1000;
     }
     
-    return 3600000; // Default 1 hour
+    return 3600000;
   }
 
-  /**
-   * Get recent alerts
-   */
   getRecentAlerts(limit: number = 10): CacheAlert[] {
     return this.alerts
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   }
 
-  /**
-   * Get recent trends
-   */
   getRecentTrends(limit: number = 50): CacheTrend[] {
     return this.history
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   }
 
-  /**
-   * Get current metrics
-   */
   getCurrentMetrics(): CacheMetrics | null {
     return this.metrics.get('overall') || null;
   }
 
-  /**
-   * Get performance history for a specific metric
-   */
   getMetricHistory(metric: string, limit: number = 100): number[] {
     const data = this.performanceData.get(metric) || [];
     return data.slice(-limit);
   }
 
-  /**
-   * Clear all analytics data
-   */
   clearData(): void {
     this.metrics.clear();
     this.history = [];
@@ -521,9 +455,6 @@ class CacheAnalyticsManager {
     console.log('📊 Cache Analytics: All data cleared');
   }
 
-  /**
-   * Export analytics data
-   */
   exportData(): string {
     const exportData = {
       config: this.config,
@@ -537,9 +468,6 @@ class CacheAnalyticsManager {
     return JSON.stringify(exportData, null, 2);
   }
 
-  /**
-   * Import analytics data
-   */
   importData(data: string): boolean {
     try {
       const parsed = JSON.parse(data);
@@ -569,13 +497,8 @@ class CacheAnalyticsManager {
   }
 }
 
-// Global instance
 export const cacheAnalyticsManager = new CacheAnalyticsManager();
-
-// Export types and utilities
 export type { CacheAnalyticsManager };
-
-// Helper functions for common analytics operations
 export const startCacheMonitoring = () => cacheAnalyticsManager.startMonitoring();
 export const stopCacheMonitoring = () => cacheAnalyticsManager.stopMonitoring();
 export const getCacheReport = () => cacheAnalyticsManager.generateReport();

@@ -8,22 +8,20 @@ import { Separator } from '@/components/ui/separator';
 import { Download, Upload, Database, FileSpreadsheet, Settings } from 'lucide-react';
 import { ExportDialog } from '@/components/dialogs/ExportDialog';
 import { ImportDialog } from '@/components/dialogs/ImportDialog';
-import { useFinancial } from '@/lib/financial-context'; // <-- 1. GANTI INI
-import { toast } from 'sonner'; // <-- Tambahkan notifikasi
+import { useFinancial } from '@/lib/financial-context';
+import { toast } from 'sonner';
 
 export default function FileTab() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
 
-  // 2. GANTI HOOK SERVER DENGAN HOOK LOKAL
   const { 
-    tabungan, // Ganti 'savings' menjadi 'tabungan'
+    tabungan,
     transaksi, 
-    exportData, // Ambil fungsi export dari context
-    importData  // Ambil fungsi import dari context
+    exportData,
+    importData
   } = useFinancial();
 
-  // 3. PERBAIKI FUNGSI EXPORT
   const handleExport = async (type: 'transactions' | 'savings') => {
     try {
       await exportData(type);
@@ -34,23 +32,17 @@ export default function FileTab() {
     }
   };
 
-  // 4. BUAT FUNGSI BARU UNTUK IMPORT
   const handleImport = async (file: File) => {
     try {
       await importData(file);
       toast.success('Data berhasil di-import!');
-      setShowImportDialog(false); // Tutup dialog setelah berhasil
+      setShowImportDialog(false);
     } catch (error) {
       console.error('Import failed:', error);
       toast.error('Import gagal. Periksa format file kamu.');
     }
   };
 
-  // 5. HAPUS FUNGSI DAN useEffect YANG TIDAK PERLU
-  // - handleImportComplete (dihapus)
-  // - useEffect untuk 'import-complete' (dihapus)
-
-  // 6. SESUAIKAN NAMA VARIABEL (savings -> tabungan, transactions -> transaksi)
   const totalSaldo = tabungan.reduce((total, t) => total + t.jumlah, 0);
   const totalPemasukan = transaksi.reduce((total, t) => 
     t.tipe === 'pemasukan' ? total + t.jumlah : total, 0
@@ -197,7 +189,6 @@ export default function FileTab() {
         </CardContent>
       </Card>
 
-      {/* 7. PERBAIKI PEMANGGILAN DIALOG */}
       <ExportDialog
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
@@ -207,7 +198,7 @@ export default function FileTab() {
       <ImportDialog
         open={showImportDialog}
         onOpenChange={setShowImportDialog}
-        onImport={handleImport} // <-- TERUSKAN FUNGSI IMPORT BARU
+        onImport={handleImport}
       />
     </div>
   );

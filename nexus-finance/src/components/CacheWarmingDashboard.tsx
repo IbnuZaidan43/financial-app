@@ -1,9 +1,3 @@
-/**
- * Cache Warming Dashboard
- * 
- * Comprehensive dashboard for intelligent cache warming management
- */
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -57,7 +51,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
   const [activeTab, setActiveTab] = useState('overview');
   const [showDetails, setShowDetails] = useState(false);
 
-  // Cache warming state
   const {
     isRunning,
     metrics,
@@ -82,19 +75,11 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
     onWarmingStopped: () => console.log('❄️ Cache warming stopped')
   });
 
-  // Monitoring
   const { alerts, clearAlerts } = useCacheWarmingMonitor();
-
-  // User behavior tracking
   const { trackAction, behaviorMetrics: userBehavior } = useUserBehaviorTracker(userId);
-
-  // Popular content monitoring
   const { trendingContent, recordAccess } = usePopularContentMonitor();
-
-  // Resource prioritization
   const { highPriorityResources, criticalResources } = useResourcePrioritizer(userId);
 
-  // Simulate some user activity for demonstration
   useEffect(() => {
     const simulateActivity = () => {
       if (Math.random() > 0.7) {
@@ -141,7 +126,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -191,7 +175,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
         </CardContent>
       </Card>
 
-      {/* Alerts */}
       {alerts.length > 0 && (
         <Card>
           <CardHeader>
@@ -225,7 +208,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
         </Card>
       )}
 
-      {/* Main Dashboard */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -236,7 +218,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-4">
@@ -287,7 +268,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
             </Card>
           </div>
 
-          {/* Progress Overview */}
           <Card>
             <CardHeader>
               <CardTitle>Warming Progress</CardTitle>
@@ -322,7 +302,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
@@ -347,7 +326,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
         </TabsContent>
 
         <TabsContent value="queue" className="space-y-4">
-          {/* Queue Status */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
@@ -418,7 +396,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
             </Card>
           </div>
 
-          {/* Completed and Failed */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
@@ -476,7 +453,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
         </TabsContent>
 
         <TabsContent value="intelligence" className="space-y-4">
-          {/* AI Recommendations */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -518,7 +494,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
             </CardContent>
           </Card>
 
-          {/* Popular Content */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -560,7 +535,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
             </CardContent>
           </Card>
 
-          {/* High Priority Resources */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -602,7 +576,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          {/* User Behavior Analytics */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -636,7 +609,6 @@ export function CacheWarmingDashboard({ userId = 'demo-user', className }: Cache
             </CardContent>
           </Card>
 
-          {/* Performance Metrics */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

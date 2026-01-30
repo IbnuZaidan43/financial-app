@@ -40,7 +40,6 @@ export default function OfflineIndicator({
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showOfflineAlert, setShowOfflineAlert] = useState(false);
 
-  // Enhanced connection detection
   useEffect(() => {
     const updateConnectionInfo = () => {
       const connection = (navigator as any).connection || 
@@ -57,7 +56,6 @@ export default function OfflineIndicator({
         lastChecked: new Date()
       });
 
-      // Show offline alert when going offline
       if (!navigator.onLine && autoHide) {
         setShowOfflineAlert(true);
       } else if (navigator.onLine) {
@@ -65,10 +63,8 @@ export default function OfflineIndicator({
       }
     };
 
-    // Initial check
     updateConnectionInfo();
 
-    // Listen for online/offline events
     const handleOnline = () => {
       updateConnectionInfo();
       setIsReconnecting(false);
@@ -78,7 +74,6 @@ export default function OfflineIndicator({
       updateConnectionInfo();
     };
 
-    // Listen for connection changes
     const handleConnectionChange = () => {
       updateConnectionInfo();
     };
@@ -91,7 +86,6 @@ export default function OfflineIndicator({
       connection.addEventListener('change', handleConnectionChange);
     }
 
-    // Periodic check every 30 seconds
     const interval = setInterval(updateConnectionInfo, 30000);
 
     return () => {
@@ -108,7 +102,6 @@ export default function OfflineIndicator({
     setIsReconnecting(true);
     
     try {
-      // Try to fetch a small resource to test connection
       const response = await fetch('/api/health', { 
         method: 'HEAD',
         cache: 'no-cache'
@@ -166,7 +159,6 @@ export default function OfflineIndicator({
     }
   };
 
-  // Simple badge version
   if (!showDetails && position === 'floating') {
     return (
       <div className={`${getPositionClasses()} ${className}`}>
@@ -190,7 +182,6 @@ export default function OfflineIndicator({
     );
   }
 
-  // Full offline alert (only when offline)
   if (!connectionInfo.isOnline && showOfflineAlert) {
     return (
       <div className={`${getPositionClasses()} ${className}`}>
@@ -256,7 +247,6 @@ export default function OfflineIndicator({
     );
   }
 
-  // Detailed status panel
   if (showDetails) {
     return (
       <div className={`${getPositionClasses()} ${className}`}>
@@ -359,6 +349,5 @@ export default function OfflineIndicator({
       </div>
     );
   }
-
   return null;
 }

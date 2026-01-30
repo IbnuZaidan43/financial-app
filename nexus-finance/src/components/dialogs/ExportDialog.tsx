@@ -21,19 +21,17 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// 1. PERBAIKI TIPE PROPS
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExport: (type: 'transactions' | 'savings') => Promise<void>; // <-- Ubah string menjadi union type
+  onExport: (type: 'transactions' | 'savings') => Promise<void>;
 }
 
 export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps) {
   const [isExporting, setIsExporting] = useState(false);
-  const [exportType, setExportType] = useState<'transactions' | 'savings' | ''>(''); // <-- Perbaiki tipe state
+  const [exportType, setExportType] = useState<'transactions' | 'savings' | ''>('');
 
-  // 2. PERBAIKI TIPE PARAMETER FUNGSI
-  const handleExportClick = async (type: 'transactions' | 'savings') => { // <-- Ubah string menjadi union type
+  const handleExportClick = async (type: 'transactions' | 'savings') => {
     setIsExporting(true);
     setExportType(type);
     
@@ -52,7 +50,7 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
 
   const exportOptions = [
     {
-      id: 'transactions' as const, // <-- Tambahkan 'as const' untuk infer tipe yang lebih spesifik
+      id: 'transactions' as const,
       title: 'Laporan Keuangan',
       description: 'Export semua transaksi',
       icon: FileSpreadsheet,
@@ -61,11 +59,11 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
         'Export semua transaksi',
         'Deskripsi dari input user',
         'Nama tabungan tercantum',
-        'Format: .xlsx (Excel Compatible)' // <-- 3. PERBAIKI TEKS FORMAT
+        'Format: .xlsx (Excel Compatible)'
       ]
     },
     {
-      id: 'savings' as const, // <-- Tambahkan 'as const'
+      id: 'savings' as const,
       title: 'Laporan Tabungan',
       description: 'Export data tabungan dan saldonya',
       icon: Calendar,
@@ -74,7 +72,7 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
         'Nama tabungan',
         'Saldo terkini',
         'Tanggal pembuatan',
-        'Format: .xlsx (Excel Compatible)' // <-- 3. PERBAIKI TEKS FORMAT
+        'Format: .xlsx (Excel Compatible)'
       ]
     }
   ];
@@ -90,7 +88,6 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Export Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {exportOptions.map((option) => {
               const Icon = option.icon;
@@ -148,7 +145,6 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
             })}
           </div>
 
-          {/* Information Section */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 text-blue-600 mt-0.5" />
@@ -164,7 +160,6 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
             </div>
           </div>
 
-          {/* Status Badges */}
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
               <CheckCircle className="h-3 w-3 mr-1" />

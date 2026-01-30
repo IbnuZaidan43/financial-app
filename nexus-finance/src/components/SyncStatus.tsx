@@ -78,7 +78,7 @@ export default function SyncStatus({
     error: storageError, 
     storageType 
   } = useLocalStorage({
-    userId: 'sync-user', // Using sync user ID for demo
+    userId: 'sync-user',
     autoSave: true,
     autoLoad: true
   });
@@ -101,13 +101,12 @@ export default function SyncStatus({
 
   const [isManualSyncing, setIsManualSyncing] = useState(false);
 
-  // Update sync info based on online status and storage data
   useEffect(() => {
     const updateSyncInfo = () => {
       const isCurrentlyOnline = isOnline;
       const hasLocalData = tabungan.length > 0 || transaksi.length > 0;
       const hasStorageError = !!storageError;
-      const hasPendingChanges = 0; // Will be implemented in Phase 2-B
+      const hasPendingChanges = 0;
 
       let newStatus: SyncStatus = 'synced';
       let newDataSource: DataSource = 'server';
@@ -143,20 +142,17 @@ export default function SyncStatus({
 
     updateSyncInfo();
 
-    // Set up periodic sync check
     if (autoSync && isOnline) {
-      const interval = setInterval(updateSyncInfo, 30000); // Check every 30 seconds
+      const interval = setInterval(updateSyncInfo, 30000);
       return () => clearInterval(interval);
     }
   }, [isOnline, tabungan, transaksi, lastSync, storageType, storageError, autoSync]);
 
-  // Manual sync function
   const handleManualSync = async () => {
     setIsManualSyncing(true);
     setSyncInfo(prev => ({ ...prev, status: 'syncing', syncProgress: 0 }));
 
     try {
-      // Simulate sync progress
       const progressInterval = setInterval(() => {
         setSyncInfo(prev => ({
           ...prev,
@@ -175,7 +171,6 @@ export default function SyncStatus({
         pendingChanges: 0
       }));
 
-      // Reset progress after success
       setTimeout(() => {
         setSyncInfo(prev => ({ ...prev, syncProgress: 0 }));
       }, 2000);
@@ -290,7 +285,6 @@ export default function SyncStatus({
     return `${days}d ago`;
   };
 
-  // Compact version
   if (variant === 'compact') {
     return (
       <TooltipProvider>
@@ -324,7 +318,6 @@ export default function SyncStatus({
     );
   }
 
-  // Default version
   if (variant === 'default') {
     return (
       <Card className={`${className}`}>
@@ -381,7 +374,6 @@ export default function SyncStatus({
     );
   }
 
-  // Detailed version
   if (variant === 'detailed' && showDetails) {
     return (
       <Card className={`${className} shadow-lg`}>
@@ -393,7 +385,6 @@ export default function SyncStatus({
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* Main Status */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-gray-700">Sync Status</h4>
@@ -422,7 +413,6 @@ export default function SyncStatus({
             </div>
           </div>
 
-          {/* Sync Progress */}
           {syncInfo.syncProgress > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -433,7 +423,6 @@ export default function SyncStatus({
             </div>
           )}
 
-          {/* Statistics */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-gray-700">Local Data</h4>
@@ -464,7 +453,6 @@ export default function SyncStatus({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-2 pt-4 border-t">
             <Button
               onClick={handleManualSync}
@@ -495,7 +483,6 @@ export default function SyncStatus({
             )}
           </div>
 
-          {/* Status Messages */}
           {!syncInfo.isOnline && (
             <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <div className="flex items-start gap-2">
@@ -541,6 +528,5 @@ export default function SyncStatus({
       </Card>
     );
   }
-
   return null;
 }

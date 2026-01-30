@@ -1,12 +1,7 @@
-// Local storage utilities for PWA Phase 2
-// Using IndexedDB for offline data persistence
-
-// Database configuration
 const DB_NAME = 'keuanganPWA';
 const DB_VERSION = 1;
 const STORE_NAME = 'keuanganData';
 
-// Data interfaces
 export interface StoredTabungan {
   id: number;
   nama: string;
@@ -41,11 +36,9 @@ export interface StoredData {
   version: string;
 }
 
-// IndexedDB operations
 class IndexedDBStorage {
   private db: IDBDatabase | null = null;
 
-  // Initialize database
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -64,11 +57,8 @@ class IndexedDBStorage {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
         
-        // Create object store if it doesn't exist
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, { keyPath: 'userId' });
-          
-          // Create indexes for efficient querying
           store.createIndex('userId', 'userId', { unique: true });
           store.createIndex('lastSync', 'lastSync', { unique: false });
           
@@ -78,7 +68,6 @@ class IndexedDBStorage {
     });
   }
 
-  // Get database instance
   private getDB(): IDBDatabase {
     if (!this.db) {
       throw new Error('IndexedDB not initialized. Call init() first.');
@@ -86,7 +75,6 @@ class IndexedDBStorage {
     return this.db;
   }
 
-  // Save data to IndexedDB
   async saveData(data: StoredData): Promise<void> {
     try {
       await this.init();
@@ -117,7 +105,6 @@ class IndexedDBStorage {
     }
   }
 
-  // Get data from IndexedDB
   async getData(userId: string): Promise<StoredData | null> {
     try {
       await this.init();
@@ -150,7 +137,6 @@ class IndexedDBStorage {
     }
   }
 
-  // Delete user data
   async deleteData(userId: string): Promise<void> {
     try {
       await this.init();
@@ -177,7 +163,6 @@ class IndexedDBStorage {
     }
   }
 
-  // Clear all data (for testing/reset)
   async clearAllData(): Promise<void> {
     try {
       await this.init();
@@ -204,7 +189,6 @@ class IndexedDBStorage {
     }
   }
 
-  // Get storage usage
   async getStorageUsage(): Promise<{ used: number; available: number }> {
     try {
       if ('storage' in navigator && 'estimate' in navigator.storage) {
@@ -223,12 +207,9 @@ class IndexedDBStorage {
   }
 }
 
-// Export singleton instance
 const indexedDBStorage = new IndexedDBStorage();
 
-// Storage utility functions
 export const storage = {
-  // Save tabungan and transaksi for a user
   async saveUserData(userId: string, tabungan: any[], transaksi: any[]): Promise<void> {
     const data: StoredData = {
       tabungan,
@@ -241,7 +222,6 @@ export const storage = {
     await indexedDBStorage.saveData(data);
   },
 
-  // Load user data
   async loadUserData(userId: string): Promise<{ tabungan: any[]; transaksi: any[] } | null> {
     const data = await indexedDBStorage.getData(userId);
     
@@ -255,33 +235,27 @@ export const storage = {
     };
   },
 
-  // Delete user data
   async deleteUserData(userId: string): Promise<void> {
     await indexedDBStorage.deleteData(userId);
   },
 
-  // Clear all data
   async clearAllData(): Promise<void> {
     await indexedDBStorage.clearAllData();
   },
-
-  // Get storage info
+  
   async getStorageInfo(): Promise<{
     usage: { used: number; available: number };
     isSupported: boolean;
     hasData: boolean;
   }> {
     const usage = await indexedDBStorage.getStorageUsage();
-    
-    // Check if IndexedDB is supported
     const isSupported = 'indexedDB' in window;
     
-    // Check if we have any data (basic check)
     let hasData = false;
     try {
       if (isSupported) {
         await indexedDBStorage.init();
-        hasData = true; // If init succeeds, assume we might have data
+        hasData = true;
       }
     } catch (error) {
       hasData = false;
@@ -294,7 +268,6 @@ export const storage = {
     };
   },
 
-  // Export data to JSON
   async exportData(userId: string): Promise<string> {
     const data = await indexedDBStorage.getData(userId);
     
@@ -305,12 +278,10 @@ export const storage = {
     return JSON.stringify(data, null, 2);
   },
 
-  // Import data from JSON
   async importData(jsonData: string): Promise<void> {
     try {
       const data: StoredData = JSON.parse(jsonData);
       
-      // Validate data structure
       if (!data.userId || !data.tabungan || !data.transaksi) {
         throw new Error('Invalid data format');
       }
@@ -328,7 +299,6 @@ export const storage = {
     }
   },
 
-  // Check if data is stale (older than specified hours)
   async isDataStale(userId: string, maxAgeHours: number = 24): Promise<boolean> {
     const data = await indexedDBStorage.getData(userId);
     
@@ -343,7 +313,6 @@ export const storage = {
     return ageInHours > maxAgeHours;
   },
 
-  // Get last sync time
   async getLastSync(userId: string): Promise<Date | null> {
     const data = await indexedDBStorage.getData(userId);
     
@@ -355,10 +324,8 @@ export const storage = {
   }
 };
 
-// Fallback to localStorage for browsers that don't support IndexedDB
 export const localStorageFallback = {
   saveData(userId: string, data: any): void {
-    // Check if running in browser environment
     if (typeof window === 'undefined') {
       console.warn('⚠️ localStorage not available in SSR environment');
       return;
@@ -378,7 +345,6 @@ export const localStorageFallback = {
   },
 
   loadData(userId: string): any | null {
-    // Check if running in browser environment
     if (typeof window === 'undefined') {
       console.warn('⚠️ localStorage not available in SSR environment');
       return null;
@@ -400,7 +366,6 @@ export const localStorageFallback = {
   },
 
   deleteData(userId: string): void {
-    // Check if running in browser environment
     if (typeof window === 'undefined') {
       console.warn('⚠️ localStorage not available in SSR environment');
       return;
@@ -416,18 +381,16 @@ export const localStorageFallback = {
   }
 };
 
-// Check storage support
 export const checkStorageSupport = (): {
   indexedDB: boolean;
   localStorage: boolean;
   recommended: 'indexedDB' | 'localStorage';
 } => {
-  // Check if running in browser environment
   if (typeof window === 'undefined') {
     return {
       indexedDB: false,
       localStorage: false,
-      recommended: 'localStorage' // Fallback for SSR
+      recommended: 'localStorage'
     };
   }
   

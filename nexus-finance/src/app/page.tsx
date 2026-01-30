@@ -35,7 +35,6 @@ import FileTab from '@/components/tabs/FileTab';
 import TransaksiDialog from '@/components/dialogs/TransaksiDialog';
 import { usePWA } from '@/hooks/usePWA'
 import PlatformBadge from '@/components/PlatformBadge';
-import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 
 export default function KeuanganPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -57,7 +56,6 @@ export default function KeuanganPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -65,7 +63,6 @@ export default function KeuanganPage() {
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Nexus Financial
               </h1>
-              {/* PlatformBadge menampilkan status PWA/Browser */}
               <PlatformBadge variant="compact" className="mt-0.5" />
             </div>
           </div>
@@ -82,7 +79,6 @@ export default function KeuanganPage() {
               </p>
             </div>
 
-            {/* Dropdown Profil Pengguna */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full border border-slate-200 p-0 overflow-hidden hover:bg-slate-100">
@@ -124,7 +120,6 @@ export default function KeuanganPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 bg-white p-1 rounded-lg shadow-sm">
@@ -188,7 +183,6 @@ export default function KeuanganPage() {
         </Tabs>
       </div>
 
-      {/* Floating Action Button */}
       <div className="fixed bottom-8 right-8 z-50">
         <Button
           onClick={() => setShowTransaksiDialog(true)}
@@ -200,7 +194,6 @@ export default function KeuanganPage() {
         </Button>
       </div>
 
-      {/* Transaksi Dialog */}
       <TransaksiDialog
         open={showTransaksiDialog}
         onOpenChange={setShowTransaksiDialog}

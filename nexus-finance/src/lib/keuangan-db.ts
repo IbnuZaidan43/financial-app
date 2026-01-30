@@ -1,6 +1,5 @@
 import Dexie, { Table } from 'dexie';
 
-// Interface untuk data tabungan
 export interface Tabungan {
   id?: number;
   nama: string;
@@ -11,7 +10,6 @@ export interface Tabungan {
   updatedAt: string;
 }
 
-// Interface untuk transaksi
 export interface Transaksi {
   id?: number;
   jenis: 'pemasukan' | 'pengeluaran';
@@ -25,10 +23,9 @@ export interface Transaksi {
   updatedAt: string;
 }
 
-// Interface untuk statistik bulanan
 export interface StatistikBulanan {
   id?: number;
-  bulan: string; // Format: YYYY-MM
+  bulan: string;
   tahun: number;
   bulanNumber: number;
   totalPemasukan: number;
@@ -55,10 +52,7 @@ class KeuanganDatabase extends Dexie {
 }
 
 export const db = new KeuanganDatabase();
-
-// Service class untuk operasi database
 export class KeuanganService {
-  // Tabungan Operations
   static async createTabungan(tabungan: Omit<Tabungan, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
     const newTabungan: Tabungan = {
       ...tabungan,
@@ -85,14 +79,12 @@ export class KeuanganService {
   }
 
   static async deleteTabungan(id: number): Promise<void> {
-    // Hapus semua transaksi terkait
     const transaksi = await db.transaksi.where('tabunganId').equals(id).toArray();
     for (const t of transaksi) {
       if (t.id) {
         await db.transaksi.delete(t.id);
       }
     }
-    // Hapus tabungan
     await db.tabungan.delete(id);
   }
 
@@ -101,7 +93,6 @@ export class KeuanganService {
     return tabungan.reduce((total, t) => total + t.saldoSaatIni, 0);
   }
 
-  // Transaksi Operations
   static async createTransaksi(transaksi: Omit<Transaksi, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
     const newTransaksi: Transaksi = {
       ...transaksi,
@@ -110,8 +101,6 @@ export class KeuanganService {
     };
 
     const id = await db.transaksi.add(newTransaksi);
-
-    // Update saldo tabungan
     await this.updateSaldoTabungan(transaksi.tabunganId, transaksi.jumlah, transaksi.jenis);
 
     return id;
@@ -148,7 +137,6 @@ export class KeuanganService {
   static async deleteTransaksi(id: number): Promise<void> {
     const transaksi = await db.transaksi.get(id);
     if (transaksi) {
-      // Kembalikan saldo tabungan
       const jumlahKembali = transaksi.jenis === 'pemasukan' ? -transaksi.jumlah : transaksi.jumlah;
       await this.updateSaldoTabungan(transaksi.tabunganId, jumlahKembali, transaksi.jenis === 'pemasukan' ? 'pengeluaran' : 'pemasukan');
       await db.transaksi.delete(id);
@@ -169,7 +157,6 @@ export class KeuanganService {
     }
   }
 
-  // Statistik Operations
   static async getPemasukanBulanIni(): Promise<number> {
     const now = new Date();
     const bulan = now.getMonth() + 1;
@@ -196,7 +183,6 @@ export class KeuanganService {
     const transaksi = await this.getAllTransaksi();
     const statistikMap = new Map<string, StatistikBulanan>();
 
-    // Group transaksi per bulan
     transaksi.forEach(t => {
       const date = new Date(t.tanggal);
       const bulanKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -223,7 +209,6 @@ export class KeuanganService {
       }
     });
 
-    // Hitung saldo akhir per bulan
     let saldoSebelumnya = 0;
     const sortedStatistik = Array.from(statistikMap.values()).sort((a, b) => {
       if (a.tahun !== b.tahun) return a.tahun - b.tahun;
@@ -238,7 +223,6 @@ export class KeuanganService {
     return sortedStatistik;
   }
 
-  // Utility functions
   static async getKategoriLabel(kategori: string): Promise<string> {
     const kategoriMap = {
       'rekening_bank': 'Rekening Bank',

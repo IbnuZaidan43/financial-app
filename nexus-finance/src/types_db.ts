@@ -1,4 +1,3 @@
-// src/types_db.ts
 export interface Database {
   public: {
     tabungan: {

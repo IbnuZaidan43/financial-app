@@ -118,7 +118,6 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* File Upload Area */}
           <Card>
             <CardContent className="p-6">
               <div
@@ -190,7 +189,6 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             </CardContent>
           </Card>
 
-          {/* Import Button */}
           {file && !importResult && (
             <div className="flex justify-center">
               <Button
@@ -213,7 +211,6 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             </div>
           )}
 
-          {/* Progress */}
           {isImporting && (
             <Card>
               <CardContent className="p-4">
@@ -228,7 +225,6 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             </Card>
           )}
 
-          {/* Import Result */}
           {importResult && (
             <Card>
               <CardContent className="p-6">
@@ -296,7 +292,6 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             </Card>
           )}
 
-          {/* Guidelines */}
           {!importResult && (
             <div className="bg-amber-50 p-4 rounded-lg">
               <div className="flex items-start gap-3">
@@ -316,7 +311,6 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={handleClose}>
               Tutup

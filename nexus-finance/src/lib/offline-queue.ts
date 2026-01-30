@@ -1,10 +1,3 @@
-/**
- * Offline Queue Manager
- * 
- * Advanced offline queue management for handling requests when offline
- * and batch processing when online.
- */
-
 'use client';
 
 export interface QueuedRequest {
@@ -100,11 +93,7 @@ export class OfflineQueueManager {
     this.startProcessing();
   }
 
-  /**
-   * Initialize batch processors
-   */
   private initializeBatchProcessors() {
-    // Financial data processor - high priority, small batches
     this.batchProcessors.push({
       name: 'Financial Data',
       canProcess: (requests) => {
@@ -117,7 +106,6 @@ export class OfflineQueueManager {
       priority: 1
     });
 
-    // User data processor - medium priority
     this.batchProcessors.push({
       name: 'User Data',
       canProcess: (requests) => {
@@ -130,7 +118,6 @@ export class OfflineQueueManager {
       priority: 2
     });
 
-    // General API processor - low priority
     this.batchProcessors.push({
       name: 'General API',
       canProcess: () => true,
@@ -142,9 +129,6 @@ export class OfflineQueueManager {
     });
   }
 
-  /**
-   * Add request to queue
-   */
   async addRequest(
     url: string,
     method: QueuedRequest['method'] = 'POST',
@@ -176,17 +160,14 @@ export class OfflineQueueManager {
     this.metrics.totalRequests++;
     this.updateMetrics();
 
-    // Sort queue by priority
     if (this.config.priorityProcessing) {
       this.sortQueueByPriority();
     }
 
-    // Persist queue
     if (this.config.persistQueue) {
       this.persistQueue();
     }
 
-    // Try to process immediately if online
     if (this.isOnline && this.config.autoProcessOnOnline) {
       this.processQueue();
     }
@@ -195,9 +176,6 @@ export class OfflineQueueManager {
     return request.id;
   }
 
-  /**
-   * Process queue
-   */
   private async processQueue(): Promise<void> {
     if (!this.isOnline || this.queue.length === 0) {
       return;
@@ -208,10 +186,7 @@ export class OfflineQueueManager {
       return;
     }
 
-    // Group requests by batch processor
     const batchGroups = this.groupRequestsByProcessor(pendingRequests);
-
-    // Process each batch
     for (const [processor, requests] of batchGroups) {
       if (requests.length === 0) continue;
 
@@ -227,14 +202,9 @@ export class OfflineQueueManager {
     }
   }
 
-  /**
-   * Group requests by suitable processor
-   */
   private groupRequestsByProcessor(requests: QueuedRequest[]): Map<BatchProcessor, QueuedRequest[]> {
     const groups = new Map<BatchProcessor, QueuedRequest[]>();
     const unprocessed: QueuedRequest[] = [];
-
-    // Sort processors by priority
     const sortedProcessors = [...this.batchProcessors].sort((a, b) => a.priority - b.priority);
 
     for (const request of requests) {
@@ -256,7 +226,6 @@ export class OfflineQueueManager {
       }
     }
 
-    // Add unprocessed requests to general processor
     if (unprocessed.length > 0) {
       const generalProcessor = this.batchProcessors.find(p => p.name === 'General API');
       if (generalProcessor) {
@@ -267,13 +236,9 @@ export class OfflineQueueManager {
     return groups;
   }
 
-  /**
-   * Process a batch of requests
-   */
   private async processBatch(requests: QueuedRequest[], processor: BatchProcessor): Promise<void> {
     const startTime = Date.now();
 
-    // Mark requests as processing
     requests.forEach(req => {
       req.status = 'processing';
       this.processing.add(req.id);
@@ -284,7 +249,6 @@ export class OfflineQueueManager {
     try {
       const processedRequests = await processor.process(requests);
       
-      // Update request statuses
       processedRequests.forEach(req => {
         this.processing.delete(req.id);
         
@@ -307,7 +271,6 @@ export class OfflineQueueManager {
       });
 
     } catch (error) {
-      // Mark all requests as failed
       requests.forEach(req => {
         req.status = 'failed';
         req.lastError = error instanceof Error ? error.message : 'Unknown error';
@@ -322,28 +285,20 @@ export class OfflineQueueManager {
     this.persistQueue();
   }
 
-  /**
-   * Handle failed request
-   */
   private handleFailedRequest(request: QueuedRequest): void {
     request.retryCount++;
 
     if (request.retryCount < request.maxRetries) {
-      // Schedule retry with exponential backoff
       const delay = this.config.retryDelay * Math.pow(2, request.retryCount);
       setTimeout(() => {
         request.status = 'pending';
         this.emit('request-retry', request);
       }, delay);
     } else {
-      // Max retries reached, mark as permanently failed
       this.emit('request-failed', request);
     }
   }
 
-  /**
-   * Batch processors implementation
-   */
   private async processFinancialBatch(requests: QueuedRequest[]): Promise<QueuedRequest[]> {
     const results: QueuedRequest[] = [];
 
@@ -436,25 +391,17 @@ export class OfflineQueueManager {
     return results;
   }
 
-  /**
-   * Sort queue by priority
-   */
   private sortQueueByPriority(): void {
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     
     this.queue.sort((a, b) => {
-      // First by priority
       const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
       if (priorityDiff !== 0) return priorityDiff;
 
-      // Then by timestamp (older first)
       return a.timestamp - b.timestamp;
     });
   }
 
-  /**
-   * Update metrics
-   */
   private updateMetrics(): void {
     this.metrics.pendingRequests = this.queue.filter(req => req.status === 'pending').length;
     this.metrics.processingRequests = this.processing.size;
@@ -464,9 +411,6 @@ export class OfflineQueueManager {
       : 0;
   }
 
-  /**
-   * Update average processing time
-   */
   private updateAverageProcessingTime(processingTime: number): void {
     const totalProcessed = this.metrics.completedRequests + this.metrics.failedRequests;
     if (totalProcessed === 1) {
@@ -477,9 +421,6 @@ export class OfflineQueueManager {
     }
   }
 
-  /**
-   * Setup network listeners
-   */
   private setupNetworkListeners(): void {
     if (typeof window !== 'undefined') {
       const handleOnline = () => {
@@ -501,9 +442,6 @@ export class OfflineQueueManager {
     }
   }
 
-  /**
-   * Start processing timer
-   */
   private startProcessing(): void {
     this.processingTimer = setInterval(() => {
       if (this.isOnline) {
@@ -512,44 +450,26 @@ export class OfflineQueueManager {
     }, this.config.batchTimeout);
   }
 
-  /**
-   * Get queue metrics
-   */
   getMetrics(): QueueMetrics {
     return { ...this.metrics };
   }
 
-  /**
-   * Get pending requests
-   */
   getPendingRequests(): QueuedRequest[] {
     return this.queue.filter(req => req.status === 'pending');
   }
 
-  /**
-   * Get failed requests
-   */
   getFailedRequests(): QueuedRequest[] {
     return this.queue.filter(req => req.status === 'failed');
   }
 
-  /**
-   * Get requests by priority
-   */
   getRequestsByPriority(priority: QueuedRequest['priority']): QueuedRequest[] {
     return this.queue.filter(req => req.priority === priority);
   }
 
-  /**
-   * Get requests by resource
-   */
   getRequestsByResource(resource: string): QueuedRequest[] {
     return this.queue.filter(req => req.metadata?.resource === resource);
   }
 
-  /**
-   * Cancel request
-   */
   cancelRequest(requestId: string): boolean {
     const index = this.queue.findIndex(req => req.id === requestId);
     if (index !== -1) {
@@ -563,9 +483,6 @@ export class OfflineQueueManager {
     return false;
   }
 
-  /**
-   * Retry failed requests
-   */
   async retryFailedRequests(): Promise<void> {
     const failedRequests = this.getFailedRequests();
     
@@ -585,9 +502,6 @@ export class OfflineQueueManager {
     this.emit('retry-failed', { count: failedRequests.length });
   }
 
-  /**
-   * Clear completed requests
-   */
   clearCompletedRequests(): number {
     const initialLength = this.queue.length;
     this.queue = this.queue.filter(req => req.status !== 'completed');
@@ -600,9 +514,6 @@ export class OfflineQueueManager {
     return clearedCount;
   }
 
-  /**
-   * Clear all requests
-   */
   clearAllRequests(): void {
     this.queue = [];
     this.processing.clear();
@@ -611,13 +522,9 @@ export class OfflineQueueManager {
     this.emit('queue-cleared');
   }
 
-  /**
-   * Update configuration
-   */
   updateConfig(newConfig: Partial<QueueConfig>): void {
     this.config = { ...this.config, ...newConfig };
     
-    // Restart processing timer if interval changed
     if (newConfig.batchTimeout) {
       if (this.processingTimer) {
         clearInterval(this.processingTimer);
@@ -626,9 +533,6 @@ export class OfflineQueueManager {
     }
   }
 
-  /**
-   * Event listeners
-   */
   on(event: string, listener: (event: string, data: any) => void): void {
     this.listeners.add(listener);
   }
@@ -647,16 +551,10 @@ export class OfflineQueueManager {
     });
   }
 
-  /**
-   * Utility methods
-   */
   private generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Persistence methods
-   */
   private persistQueue(): void {
     try {
       if (this.config.persistQueue && typeof window !== 'undefined' && window.localStorage) {
@@ -681,9 +579,6 @@ export class OfflineQueueManager {
     }
   }
 
-  /**
-   * Cleanup
-   */
   destroy(): void {
     if (this.processingTimer) {
       clearInterval(this.processingTimer);
@@ -697,5 +592,4 @@ export class OfflineQueueManager {
   }
 }
 
-// Global instance
 export const offlineQueueManager = new OfflineQueueManager();

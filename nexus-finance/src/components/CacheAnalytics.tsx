@@ -1,9 +1,3 @@
-/**
- * Cache Analytics UI Components
- * 
- * UI components for cache monitoring, analytics, and performance visualization.
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -139,7 +133,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
     }
   };
 
-  // Chart data preparation
   const hitRateChartData = performanceData.timestamps.map((timestamp, index) => ({
     time: new Date(timestamp).toLocaleTimeString(),
     hitRate: performanceData.hitRate[index] || 0
@@ -163,7 +156,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
   return (
     <div className={className}>
       <div className="grid gap-6">
-        {/* Status Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Cache Analytics Dashboard</h2>
@@ -186,7 +178,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
           </div>
         </div>
 
-        {/* Key Metrics Overview */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -251,7 +242,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
           </Card>
         </div>
 
-        {/* Alerts Section */}
         {unreadCount > 0 && (
           <Alert>
             <AlertTriangle className="h-4 w-4" />
@@ -264,7 +254,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
           </Alert>
         )}
 
-        {/* Main Analytics Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -276,7 +265,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Storage Usage Chart */}
               <Card>
                 <CardHeader>
                   <CardTitle>Storage Usage</CardTitle>
@@ -307,7 +295,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
                 </CardContent>
               </Card>
 
-              {/* Hit Rate Chart */}
               <Card>
                 <CardHeader>
                   <CardTitle>Cache Performance</CardTitle>
@@ -339,7 +326,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
               </Card>
             </div>
 
-            {/* Hit Rate Trend */}
             <Card>
               <CardHeader>
                 <CardTitle>Hit Rate Trend</CardTitle>
@@ -370,7 +356,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
 
           <TabsContent value="performance" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Response Time Chart */}
               <Card>
                 <CardHeader>
                   <CardTitle>Response Time Trend</CardTitle>
@@ -398,7 +383,6 @@ export function CacheAnalyticsDashboard({ className }: CacheAnalyticsDashboardPr
                 </CardContent>
               </Card>
 
-              {/* Performance Metrics */}
               <Card>
                 <CardHeader>
                   <CardTitle>Performance Metrics</CardTitle>
@@ -633,7 +617,6 @@ export function CacheAnalyticsStatus({ className }: CacheAnalyticsStatusProps) {
   );
 }
 
-// Helper function
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;

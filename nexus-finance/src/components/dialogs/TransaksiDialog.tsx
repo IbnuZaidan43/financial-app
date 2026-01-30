@@ -37,7 +37,7 @@ interface TransaksiDialogProps {
 }
 
 export default function TransaksiDialog({ open, onOpenChange, tabungan }: TransaksiDialogProps) {
-  const { refreshTransaksi, refreshTabungan } = useFinancial();
+  const { createTransaksi } = useFinancial();
   const [formData, setFormData] = useState({
     tipe: 'pemasukan' as 'pemasukan' | 'pengeluaran',
     jumlah: '',
@@ -46,7 +46,6 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
     tanggal: new Date().toISOString().split('T')[0]
   });
 
-  // Fungsi untuk mendeteksi kategori dari nama tabungan
   const getKategoriFromNama = (nama: string) => {
     const lowerNama = nama.toLowerCase();
     if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
@@ -65,7 +64,6 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
     return 'lainnya';
   };
 
-  // Fungsi untuk mendapatkan icon berdasarkan kategori
   const getKategoriIcon = (kategori: string) => {
     switch (kategori) {
       case 'bank': return <Building className="h-4 w-4" />;
@@ -76,7 +74,6 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
     }
   };
 
-  // Fungsi untuk mendapatkan warna berdasarkan kategori
   const getKategoriColor = (kategori: string) => {
     switch (kategori) {
       case 'bank': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -87,7 +84,6 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
     }
   };
 
-  // Fungsi untuk filter tabungan berdasarkan tipe transaksi
   const getFilteredTabungan = () => {
     return tabungan;
   };
@@ -116,53 +112,30 @@ export default function TransaksiDialog({ open, onOpenChange, tabungan }: Transa
         toast.error('Tabungan tidak ditemukan');
         return;
       }
-      console.log('📝 Creating transaction...');
       
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tabunganId: selectedTabungan.id,
-          judul: formData.deskripsi || 'Transaksi',
-          jumlah: parseFloat(formData.jumlah.replace(/\./g, '')),
-          deskripsi: formData.deskripsi || 'Transaksi tanpa keterangan',
-          tipe: formData.tipe,
-          tanggal: formData.tanggal,
-          kategoriId: null
-        }),
+      await createTransaksi({
+        tabunganId: selectedTabungan.id,
+        judul: formData.deskripsi || (formData.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'),
+        jumlah: parseFloat(formData.jumlah.replace(/\./g, '')),
+        deskripsi: formData.deskripsi || '',
+        tipe: formData.tipe,
+        tanggal: formData.tanggal,
+        kategoriId: undefined
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create transaction');
-      }
-
-      const transaction = await response.json();
-      console.log('✅ Transaction created:', transaction);
-      
-       if (formData.tipe === 'pengeluaran') {
+      if (formData.tipe === 'pengeluaran') {
         const amount = parseFloat(formData.jumlah.replace(/\./g, ''));
         if (amount > 50000) {
-          toast.warning("Pengeluaran lebih dari Rp 50.000", {
-            description: "Pertimbangkan untuk berhemat ya! 💰",
+          toast.warning("Pengeluaran cukup besar", {
+            description: "Catatan tersimpan. Jangan lupa kontrol pengeluaran ya! 💰",
           });
         }
       }
 
       toast.success("Transaksi berhasil disimpan!");
-
       resetForm();
       onOpenChange(false);
-      
-      console.log('🔄 Refreshing data...');
-      await refreshTransaksi();
-      await refreshTabungan();
-      console.log('✅ Data refreshed');
-      
     } catch (error) {
-      console.error('❌ Error creating transaksi:', error);
       toast.error('Gagal menyimpan transaksi: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };

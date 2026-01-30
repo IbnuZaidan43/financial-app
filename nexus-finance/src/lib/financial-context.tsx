@@ -2,7 +2,6 @@
 
 import { useSession } from 'next-auth/react';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { Tabungan, Transaksi } from '@prisma/client';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { syncTransaksiToCloud, syncTabunganToCloud, getFinancialData, deleteTabunganFromCloud, deleteTransaksiFromCloud } from '@/app/actions';
 import * as XLSX from 'xlsx';
@@ -29,7 +28,6 @@ interface TransaksiData {
   updatedAt: string | Date;
 }
 
-// Data source types (disederhanakan untuk local-first)
 type DataSource = 'local';
 
 interface FinancialContextType {
@@ -386,7 +384,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     if (transactionToDelete.tabunganId) {
       newTabunganList = tabungan.map((t) => {
         if (t.id === transactionToDelete.tabunganId) {
-          // Logika Reversal (Kebalikan)
           const amountChange = transactionToDelete.tipe === 'pemasukan' 
             ? -transactionToDelete.jumlah
             : transactionToDelete.jumlah;
@@ -480,7 +477,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   }
 };
 
-// Fungsi untuk import dari Excel
 const importData = async (file: File) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

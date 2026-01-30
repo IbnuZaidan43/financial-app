@@ -68,7 +68,6 @@ interface DashboardTabProps {
 }
 
 export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canInstall, installPWA }: DashboardTabProps) {
-  // Get financial context for sync status
   const { 
     isOnline,
     syncStatus, 
@@ -82,7 +81,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Helper functions for sync status
   const getSyncIcon = () => {
     switch (syncStatus) {
       case 'synced': return <Database className="w-4 h-4" />;
@@ -103,18 +101,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
     }
   };
 
-  // NEW: Helper function for PWA install status
-  const getPWAInstallIcon = () => {
-    return <Download className="w-4 h-4" />;
-  };
-
-  const getPWAInstallColor = () => {
-    // Gunakan canInstall untuk logika warna
-    return canInstall 
-      ? 'bg-green-100 text-green-800 border-green-300' 
-      : 'bg-gray-100 text-gray-800 border-gray-300';
-  };
-
   const formatLastSync = (date: Date | null) => {
     if (!date) return 'Never';
     const now = new Date();
@@ -127,12 +113,11 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  // Handle manual sync
   const handleForceSync = async () => {
     setIsSyncing(true);
     try {
       await forceSync();
-      await onDataUpdate(); // Refresh parent data
+      await onDataUpdate();
     } catch (error) {
       console.error('Sync failed:', error);
     } finally {
@@ -140,7 +125,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
     }
   };
 
-  // Fungsi untuk mendeteksi kategori dari nama tabungan
   const getKategoriFromNama = (nama: string) => {
     const lowerNama = nama.toLowerCase();
     if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
@@ -159,7 +143,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
     return 'lainnya';
   };
 
-  // Fungsi untuk mendapatkan icon berdasarkan kategori
   const getKategoriIcon = (kategori: string) => {
     switch (kategori) {
       case 'bank': return <Building className="h-3 w-3" />;
@@ -170,7 +153,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
     }
   };
 
-  // Fungsi untuk mendapatkan warna berdasarkan kategori
   const getKategoriColor = (kategori: string) => {
     switch (kategori) {
       case 'bank': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -275,7 +257,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
 
   return (
     <div className="space-y-6">
-      {/* Sync Status Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center gap-3">
           <Badge className={`${getSyncColor()} flex items-center gap-1`}>
@@ -329,7 +310,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
         </div>
       </div>
 
-      {/* Offline Mode Alert */}
       {!isOnline && (
         <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-start gap-2">
@@ -582,7 +562,6 @@ export default function DashboardTab({ tabungan, transaksi, onDataUpdate, canIns
         </CardContent>
       </Card>
 
-      {/* NEW: PWA Install Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

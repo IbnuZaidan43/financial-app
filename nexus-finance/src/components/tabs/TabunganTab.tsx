@@ -26,9 +26,7 @@ import {
   Banknote
 } from 'lucide-react';
 import { useFinancial } from '@/lib/financial-context';
-import type { Tabungan as PrismaTabungan } from '@prisma/client';
 
-// Use the same type as in financial context to avoid conflicts
 type Tabungan = {
   id: string;
   nama: string;
@@ -43,7 +41,6 @@ interface TabunganTabProps {
 }
 
 export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
-  // NEW: Get financial context for sync status
   const { 
     isOnline,
     syncStatus, 
@@ -64,7 +61,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
   });
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // NEW: Helper functions for sync status
   const getSyncIcon = () => {
     switch (syncStatus) {
       case 'synced': return <Database className="w-4 h-4" />;
@@ -97,12 +93,11 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  // NEW: Handle manual sync
   const handleForceSync = async () => {
     setIsSyncing(true);
     try {
       await forceSync();
-      await onDataUpdate(); // Refresh parent data
+      await onDataUpdate();
     } catch (error) {
       console.error('Sync failed:', error);
     } finally {
@@ -110,7 +105,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
   };
 
-  // Fungsi untuk mendeteksi kategori dari nama tabungan
   const getKategoriFromNama = (nama: string) => {
     const lowerNama = nama.toLowerCase();
     if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
@@ -140,7 +134,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     }
   };
 
-  // Fungsi untuk mendapatkan warna berdasarkan kategori
   const getKategoriColor = (kategori: string) => {
     switch (kategori) {
       case 'bank': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -250,7 +243,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* NEW: Sync Status Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center gap-3">
           <Badge className={`${getSyncColor()} flex items-center gap-1`}>
@@ -297,7 +289,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </div>
       </div>
 
-      {/* NEW: Offline Mode Alert */}
       {!isOnline && (
         <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-start gap-2">
@@ -379,7 +370,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Dialog>
       </div>
 
-      {/* Total Saldo Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
@@ -402,7 +392,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </CardContent>
       </Card>
 
-      {/* Total Saldo by Kategori */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {totalSaldoByKategori.map(({ kategori, total, count }) => (
           <Card key={kategori} className="hover:shadow-md transition-shadow">
@@ -429,7 +418,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         ))}
       </div>
 
-      {/* Daftar Tabungan by Kategori */}
       {Object.entries(tabunganByKategori).map(([kategori, items]) => (
         <div key={kategori} className="space-y-4">
           <div className="flex items-center gap-2">
@@ -512,7 +500,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </div>
       ))}
 
-      {/* Empty State */}
       {tabungan.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
@@ -529,7 +516,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
         </Card>
       )}
 
-      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>

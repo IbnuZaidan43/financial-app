@@ -1,6 +1,5 @@
 'use client';
 
-// Tambahkan impor useState dan useEffect
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,6 @@ import {
 } from 'recharts';
 import { useAssetOptimization } from '@/hooks/use-asset-optimization';
 
-// Pindahkan atau definisikan formatBytes di sini jika di @/lib/utils tidak ada
 const formatBytes = (bytes: number, decimals = 2) => {
   if (!bytes || bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -109,7 +107,6 @@ export function AssetOptimizationDashboard({ className }: AssetOptimizationDashb
     );
   }
 
-  // Safely prepare chart data dengan pengecekan null/undefined
   const formatData = Object.entries(stats.formatDistribution || {}).map(([format, count]) => ({
     name: format.toUpperCase(),
     value: count
@@ -124,7 +121,6 @@ export function AssetOptimizationDashboard({ className }: AssetOptimizationDashb
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -171,7 +167,6 @@ export function AssetOptimizationDashboard({ className }: AssetOptimizationDashb
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -224,7 +219,6 @@ export function AssetOptimizationDashboard({ className }: AssetOptimizationDashb
         </Card>
       </div>
 
-      {/* Recent Optimizations */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Optimizations</CardTitle>
@@ -268,7 +262,6 @@ export function AssetOptimizationDashboard({ className }: AssetOptimizationDashb
         </CardContent>
       </Card>
 
-      {/* Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Cache Management</CardTitle>
@@ -297,7 +290,6 @@ export function AssetOptimizationDashboard({ className }: AssetOptimizationDashb
   );
 }
 
-// AssetStatus Component
 export function AssetStatus({ url, className }: { url: string; className?: string }) {
   const { optimizedAssets } = useAssetOptimization();
   const optimization = optimizedAssets?.get(url);
@@ -328,7 +320,6 @@ export function AssetStatus({ url, className }: { url: string; className?: strin
   );
 }
 
-// OptimizedImage Component
 export function OptimizedImage({ 
   src, 
   alt, 

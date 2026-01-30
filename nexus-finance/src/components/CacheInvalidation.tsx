@@ -1,9 +1,3 @@
-/**
- * Cache Invalidation UI Components
- * 
- * UI components for cache invalidation management and monitoring.
- */
-
 'use client';
 
 import React, { useState } from 'react';
@@ -96,7 +90,6 @@ export function CacheInvalidationDashboard({ className }: CacheInvalidationDashb
   return (
     <div className={className}>
       <div className="grid gap-6">
-        {/* Status Overview */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -159,7 +152,6 @@ export function CacheInvalidationDashboard({ className }: CacheInvalidationDashb
           </Card>
         </div>
 
-        {/* Control Panel */}
         <Tabs defaultValue="presets" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="presets">Quick Actions</TabsTrigger>

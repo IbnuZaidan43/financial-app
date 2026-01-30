@@ -46,7 +46,6 @@ export default function PWAInstallPrompt({
   const [dismissed, setDismissed] = useState(false);
   const [installStatus, setInstallStatus] = useState<'idle' | 'installing' | 'success' | 'error'>('idle');
 
-  // Check if PWA is already installed
   useEffect(() => {
     const checkInstalled = () => {
       const isPWAInstalled = 
@@ -63,7 +62,6 @@ export default function PWAInstallPrompt({
     return () => window.removeEventListener('appinstalled', checkInstalled);
   }, []);
 
-  // Auto-hide logic
   useEffect(() => {
     if (autoHide && isInstalled) {
       setIsVisible(false);
@@ -74,7 +72,6 @@ export default function PWAInstallPrompt({
     }
   }, [canInstall, dismissed, isInstalled, autoHide]);
 
-  // Listen for install events
   useEffect(() => {
     const handleAppInstalled = () => {
       setInstallStatus('success');
@@ -107,7 +104,6 @@ export default function PWAInstallPrompt({
     dismissInstallPrompt();
   };
 
-  // Don't show if already installed or can't install
   if (isInstalled || !canInstall || !isVisible) {
     return null;
   }

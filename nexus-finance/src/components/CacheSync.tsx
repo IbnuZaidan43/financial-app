@@ -1,9 +1,3 @@
-/**
- * Cache Sync UI Components
- * 
- * UI components for cache synchronization management and monitoring.
- */
-
 'use client';
 
 import React, { useState } from 'react';
@@ -117,7 +111,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
     }
   };
 
-  // Chart data
   const syncPerformanceData = [
     { name: 'Success', value: stats.successfulSyncs, color: '#10b981' },
     { name: 'Failed', value: stats.failedSyncs, color: '#ef4444' },
@@ -138,7 +131,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
   return (
     <div className={className}>
       <div className="grid gap-6">
-        {/* Status Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Cache Sync Dashboard</h2>
@@ -159,7 +151,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
           </div>
         </div>
 
-        {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -215,7 +206,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
           </Card>
         </div>
 
-        {/* Alerts */}
         {unresolvedConflicts.length > 0 && (
           <Alert>
             <AlertTriangle className="h-4 w-4" />
@@ -228,7 +218,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
           </Alert>
         )}
 
-        {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -240,7 +229,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Sync Performance Chart */}
               <Card>
                 <CardHeader>
                   <CardTitle>Sync Performance</CardTitle>
@@ -276,7 +264,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
                 </CardContent>
               </Card>
 
-              {/* Priority Distribution */}
               <Card>
                 <CardHeader>
                   <CardTitle>Priority Distribution</CardTitle>
@@ -300,7 +287,6 @@ export function CacheSyncDashboard({ className }: CacheSyncDashboardProps) {
               </Card>
             </div>
 
-            {/* Quick Actions */}
             <Card>
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>

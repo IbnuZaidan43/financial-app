@@ -27,14 +27,13 @@ import {
 } from 'lucide-react';
 import { useFinancial } from '@/lib/financial-context';
 
-// Interface yang sesuai dengan schema baru
 interface TransaksiData {
   id: string;
   judul: string;
   jumlah: number;
   deskripsi: string | null;
   tanggal: string | Date;
-  tipe: string; // 'pemasukan' atau 'pengeluaran'
+  tipe: string;
   kategoriId: string | null;
   tabunganId: string | null;
   createdAt: string | Date;
@@ -57,7 +56,6 @@ interface RiwayatTransaksiTabProps {
 }
 
 export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate }: RiwayatTransaksiTabProps) {
-  // NEW: Get financial context for sync status
   const { 
     isOnline,
     syncStatus, 
@@ -72,7 +70,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
   const [filterBulan, setFilterBulan] = useState<string>('semua');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // NEW: Helper functions for sync status
   const getSyncIcon = () => {
     switch (syncStatus) {
       case 'synced': return <Database className="w-4 h-4" />;
@@ -105,12 +102,11 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  // NEW: Handle manual sync
   const handleForceSync = async () => {
     setIsSyncing(true);
     try {
       await forceSync();
-      await onDataUpdate(); // Refresh parent data
+      await onDataUpdate();
     } catch (error) {
       console.error('Sync failed:', error);
     } finally {
@@ -118,7 +114,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     }
   };
 
-  // Generate bulan options
   const bulanOptions = [
     { value: '1', label: 'Januari' },
     { value: '2', label: 'Februari' },
@@ -134,7 +129,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     { value: '12', label: 'Desember' }
   ];
 
-  // Fungsi untuk mendeteksi kategori dari nama tabungan
   const getKategoriFromNama = (nama: string) => {
     const lowerNama = nama.toLowerCase();
     if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
@@ -153,7 +147,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     return 'lainnya';
   };
 
-  // Fungsi untuk mendapatkan icon berdasarkan kategori
   const getKategoriIcon = (kategori: string) => {
     switch (kategori) {
       case 'bank': return <Building className="h-3 w-3" />;
@@ -164,7 +157,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     }
   };
 
-  // Fungsi untuk mendapatkan warna berdasarkan kategori
   const getKategoriColor = (kategori: string) => {
     switch (kategori) {
       case 'bank': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -175,40 +167,33 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
     }
   };
 
-  // Get nama tabungan dari tabunganId
   const getTabunganNama = (tabunganId: string | null) => {
     if (!tabunganId) return 'Tidak diketahui';
     const tab = tabungan.find(t => t.id === tabunganId);
     return tab ? tab.nama : 'Tabungan dihapus';
   };
 
-  // Get kategori dari nama tabungan
   const getTabunganKategori = (tabunganId: string | null) => {
     if (!tabunganId) return 'lainnya';
     const tab = tabungan.find(t => t.id === tabunganId);
     return tab ? getKategoriFromNama(tab.nama) : 'lainnya';
   };
 
-  // Filter transaksi
   const filteredTransaksi = useMemo(() => {
     return transaksi.filter(t => {
-      // Search filter - cari di judul dan deskripsi
       const searchText = (t.judul + ' ' + (t.deskripsi || '')).toLowerCase();
       if (searchTerm && !searchText.includes(searchTerm.toLowerCase())) {
         return false;
       }
 
-      // Tabungan filter
       if (filterTabungan !== 'semua' && t.tabunganId?.toString() !== filterTabungan) {
         return false;
       }
 
-      // Jenis filter - menggunakan tipe bukan jenis
       if (filterJenis !== 'semua' && t.tipe !== filterJenis) {
         return false;
       }
 
-      // Bulan filter
       if (filterBulan !== 'semua') {
         const bulanTransaksi = new Date(t.tanggal).getMonth() + 1;
         if (bulanTransaksi.toString() !== filterBulan) {
@@ -232,7 +217,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
 
   return (
     <div className="space-y-6">
-      {/* NEW: Sync Status Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center gap-3">
           <Badge className={`${getSyncColor()} flex items-center gap-1`}>
@@ -279,7 +263,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
         </div>
       </div>
 
-      {/* NEW: Offline Mode Alert */}
       {!isOnline && (
         <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-start gap-2">
@@ -294,7 +277,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
         </div>
       )}
 
-      {/* Filter Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -304,7 +286,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Search Bar */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -315,9 +296,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
               />
             </div>
 
-            {/* Horizontal Filters */}
             <div className="flex flex-col sm:flex-row gap-3">
-              {/* Filter Tabungan */}
               <Select value={filterTabungan} onValueChange={setFilterTabungan}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Semua Tabungan" />
@@ -338,7 +317,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                 </SelectContent>
               </Select>
 
-              {/* Filter Jenis */}
               <Select value={filterJenis} onValueChange={setFilterJenis}>
                 <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="Semua Jenis" />
@@ -350,7 +328,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                 </SelectContent>
               </Select>
 
-              {/* Filter Bulan */}
               <Select value={filterBulan} onValueChange={setFilterBulan}>
                 <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="Semua Bulan" />
@@ -369,7 +346,6 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
         </CardContent>
       </Card>
 
-      {/* Transaksi List */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">

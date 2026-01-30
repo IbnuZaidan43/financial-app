@@ -4,8 +4,8 @@ import {
   Monitor, 
   Smartphone, 
   Globe, 
-  Compass, // Pengganti Safari
-  Laptop,  // Pengganti Windows/Mac
+  Compass,
+  Laptop,
   Tablet,
   Package,
   Info,
@@ -21,14 +21,6 @@ interface PlatformBadgeProps {
   showDetails?: boolean;
   variant?: 'default' | 'compact' | 'detailed';
   position?: 'static' | 'floating';
-}
-
-interface PlatformInfo {
-  platform: string;
-  browser: string;
-  isPWA: boolean;
-  isStandalone: boolean;
-  isInstallable: boolean;
 }
 
 export default function PlatformBadge({ 
@@ -56,7 +48,7 @@ export default function PlatformBadge({
   const getBrowserIcon = () => {
     const b = browser.toLowerCase();
     if (b.includes('safari')) return <Compass className="w-4 h-4" />;
-    return <Globe className="w-4 h-4" />; // Chrome, Edge, Firefox menggunakan Globe
+    return <Globe className="w-4 h-4" />;
   };
 
   const getPlatformColor = () => {
@@ -132,7 +124,6 @@ export default function PlatformBadge({
     }
   };
 
-  // Compact version
   if (variant === 'compact') {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
@@ -154,7 +145,6 @@ export default function PlatformBadge({
     );
   }
 
-  // Default version
   if (variant === 'default') {
     return (
       <div className={`${className}`}>
@@ -186,7 +176,6 @@ export default function PlatformBadge({
     );
   }
 
-  // Detailed version
   if (variant === 'detailed' && showDetails) {
     return (
       <div className={`${className}`}>
@@ -198,7 +187,6 @@ export default function PlatformBadge({
             </h3>
             
             <div className="space-y-4">
-              {/* Platform Section */}
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-gray-700">Platform</h4>
                 <div className="flex items-center gap-2">
@@ -212,7 +200,6 @@ export default function PlatformBadge({
                 </div>
               </div>
 
-              {/* Browser Section */}
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-gray-700">Browser</h4>
                 <div className="flex items-center gap-2">
@@ -226,7 +213,6 @@ export default function PlatformBadge({
                 </div>
               </div>
 
-              {/* PWA Status Section */}
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-gray-700">PWA Status</h4>
                 <div className="flex items-center gap-2">
@@ -244,8 +230,7 @@ export default function PlatformBadge({
                   </Badge>
                 </div>
               </div>
-
-              {/* Additional Info */}
+              
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Technical Details</h4>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -273,7 +258,6 @@ export default function PlatformBadge({
                 </div>
               </div>
 
-              {/* User Agent */}
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <h4 className="text-sm font-medium text-blue-700 mb-2">User Agent</h4>
                 <div className="text-xs text-blue-600 font-mono break-all">
@@ -286,6 +270,5 @@ export default function PlatformBadge({
       </div>
     );
   }
-
   return null;
 }

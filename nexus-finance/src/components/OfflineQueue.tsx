@@ -1,9 +1,3 @@
-/**
- * Offline Queue UI Components
- * 
- * UI components for offline queue management and monitoring.
- */
-
 'use client';
 
 import React, { useState } from 'react';
@@ -83,8 +77,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
   });
 
   const { alerts, clearAlerts } = useOfflineQueueMonitor();
-  const { addFinancialRequest, addUserRequest, addCacheRequest } = useRequestManager();
-
   const [activeTab, setActiveTab] = useState('overview');
   const [showDetails, setShowDetails] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -110,17 +102,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'default';
-      case 'failed': return 'destructive';
-      case 'processing': return 'secondary';
-      case 'pending': return 'outline';
-      default: return 'outline';
-    }
-  };
-
-  // Chart data
   const priorityData = [
     { name: 'Critical', value: stats.priorityDistribution.critical, color: '#dc2626' },
     { name: 'High', value: stats.priorityDistribution.high, color: '#ea580c' },
@@ -142,7 +123,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
   return (
     <div className={className}>
       <div className="grid gap-6">
-        {/* Status Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Offline Queue Dashboard</h2>
@@ -160,7 +140,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
           </div>
         </div>
 
-        {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -213,7 +192,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
           </Card>
         </div>
 
-        {/* Alerts */}
         {alerts.length > 0 && (
           <div className="space-y-2">
             {alerts.map((alert, index) => (
@@ -228,7 +206,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
           </div>
         )}
 
-        {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -240,7 +217,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Priority Distribution */}
               <Card>
                 <CardHeader>
                   <CardTitle>Priority Distribution</CardTitle>
@@ -276,7 +252,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
                 </CardContent>
               </Card>
 
-              {/* Status Distribution */}
               <Card>
                 <CardHeader>
                   <CardTitle>Status Distribution</CardTitle>
@@ -300,7 +275,6 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
               </Card>
             </div>
 
-            {/* Quick Actions */}
             <Card>
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
@@ -405,7 +379,7 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {/* Cancel request */}}
+                              onClick={() =>
                             >
                               <XCircle className="w-4 h-4" />
                             </Button>
