@@ -2,18 +2,38 @@
 import { prisma } from '@/lib/prisma';
 
 export async function syncTransaksiToCloud(userId: string, data: any) {
+  const { id, tanggal, createdAt, updatedAt, ...rest } = data;
+
   return await prisma.transaksi.upsert({
-    where: { id: data.id },
-    update: data,
-    create: { ...data, userId }
+    where: { id: id },
+    update: {
+      ...rest,
+      tanggal: new Date(tanggal),
+      updatedAt: new Date(),
+    },
+    create: {
+      ...rest,
+      id: id,
+      userId: userId,
+      tanggal: new Date(tanggal),
+    }
   });
 }
 
 export async function syncTabunganToCloud(userId: string, data: any) {
+  const { id, createdAt, updatedAt, ...rest } = data;
+
   return await prisma.tabungan.upsert({
-    where: { id: data.id },
-    update: data,
-    create: { ...data, userId }
+    where: { id: id },
+    update: {
+      ...rest,
+      updatedAt: new Date(),
+    },
+    create: {
+      ...rest,
+      id: id,
+      userId: userId
+    }
   });
 }
 

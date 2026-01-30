@@ -219,7 +219,6 @@ export default function TabunganTab({ onDataUpdate }: TabunganTabProps) {
     if (confirm(`Apakah Anda yakin ingin menghapus tabungan "${nama}"?`)) {
       try {
         await deleteTabungan(id);
-        alert('Tabungan berhasil dihapus');
       } catch (error) {
         alert('Gagal menghapus tabungan');
       }

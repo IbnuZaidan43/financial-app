@@ -113,6 +113,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error(`☁️ Sync Error (${type}):`, error);
       setSyncStatus('error');
+      throw error;
     }
   };
 
@@ -173,23 +174,20 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   }, [status, session?.user?.id, isMigrating]);
 
   const fetchFromCloud = async (id: string) => {
-    if (!navigator.onLine || id === 'default_user') {
-      setSyncStatus('offline');
-      return;
-    }
-    
+    if (!navigator.onLine || id === 'default_user') return;
     setSyncStatus('syncing');
+
     try {
       const cloudData = await getFinancialData(id);
-      
-      if (cloudData) {
+      if (cloudData && (cloudData.tabungan.length > 0 || cloudData.transaksi.length > 0)) {
         setTabungan(cloudData.tabungan);
         setTransaksi(cloudData.transaksi);
         updateData(cloudData.tabungan, cloudData.transaksi);
-        
-        setSyncStatus('synced');
-        setLastSync(new Date());
+        console.log('✅ Data berhasil disinkronkan dari Cloud');
       }
+      
+      setSyncStatus('synced');
+      setLastSync(new Date());
     } catch (error) {
       console.error('❌ Gagal fetch dari cloud:', error);
       setSyncStatus('error');
@@ -325,10 +323,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   }) => {
     const newTransaksi: TransaksiData = {
       id: crypto.randomUUID(),
-      judul: data.judul,
+      judul: data.judul || (data.tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'),
       jumlah: data.jumlah,
       deskripsi: data.deskripsi || null,
-      tanggal: data.tanggal,
+      tanggal: new Date(data.tanggal).toISOString(), 
       tipe: data.tipe,
       kategoriId: data.kategoriId || null,
       tabunganId: data.tabunganId || null,
@@ -336,35 +334,42 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date()
     };
 
-    let updatedTabList: TabunganData[] = [...tabungan];
-    let affectedTab: TabunganData | null = null;
+    const oldTransactions = [...transaksi];
+    const oldSavings = [...tabungan];
+    const newTransactionsList = [newTransaksi, ...oldTransactions];
+    setTransaksi(newTransactionsList);
 
-    setTransaksi((prev) => [newTransaksi, ...prev]);
+    let affectedTab: TabunganData | null = null;
+    let newTabunganList = [...oldSavings];
 
     if (data.tabunganId) {
-      setTabungan((prev) => 
-        prev.map((t) => {
-          if (t.id === data.tabunganId) {
-            const change = data.tipe === 'pengeluaran' ? -data.jumlah : data.jumlah;
-            const updated = { ...t, jumlah: t.jumlah + change, updatedAt: new Date() };
-            affectedTab = updated;
-            return updated;
-          }
-          return t;
-        })
-      );
-      updatedTabList = tabungan.map(t => t.id === data.tabunganId ? affectedTab! : t);
+      newTabunganList = oldSavings.map((t) => {
+        if (t.id === data.tabunganId) {
+          const change = data.tipe === 'pengeluaran' ? -data.jumlah : data.jumlah;
+          const updated = { ...t, jumlah: t.jumlah + change, updatedAt: new Date() };
+          affectedTab = updated;
+          return updated;
+        }
+        return t;
+      });
+      setTabungan(newTabunganList);
     }
-    
+
     try {
-      await updateData(updatedTabList, [newTransaksi, ...transaksi]);
+      await updateData(newTabunganList, newTransactionsList);
       await syncToCloud('transaksi', newTransaksi);
-      if (affectedTab) await syncToCloud('tabungan', affectedTab);
-        
+      
+      if (affectedTab) {
+        console.log('☁️ Sinkronisasi saldo tabungan ke Supabase...');
+        await syncToCloud('tabungan', affectedTab);
+      }
+      
       return newTransaksi;
     } catch (error) {
-      refreshTabungan();
-      refreshTransaksi();
+      console.error("❌ Gagal sinkron ke Cloud, memulihkan data lokal...", error);
+      setTransaksi(oldTransactions);
+      setTabungan(oldSavings);
+      await updateData(oldSavings, oldTransactions);
       throw error;
     }
   };
@@ -375,15 +380,14 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
     const originalTransactions = [...transaksi];
     const originalSavings = [...tabungan];
-
     const updatedTransactions = originalTransactions.filter((t) => t.id !== id);
     setTransaksi(updatedTransactions);
 
     let affectedTab: TabunganData | null = null;
-    let newTabunganList = [...tabungan];
+    let newTabunganList = [...originalSavings];
 
     if (transactionToDelete.tabunganId) {
-      newTabunganList = tabungan.map((t) => {
+      newTabunganList = originalSavings.map((t) => {
         if (t.id === transactionToDelete.tabunganId) {
           const amountChange = transactionToDelete.tipe === 'pemasukan' 
             ? -transactionToDelete.jumlah
@@ -401,18 +405,18 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     try {
       await updateData(newTabunganList, updatedTransactions);
       if (status === 'authenticated') {
-        console.log('🗑️ Menghapus transaksi di cloud...');
         await deleteTransaksiFromCloud(userId, id);
         if (affectedTab) {
           await syncTabunganToCloud(userId, affectedTab);
         }
       }
       
-      console.log('✅ Transaksi berhasil dihapus dan saldo disesuaikan');
+      console.log('✅ Berhasil hapus transaksi');
     } catch (error) {
       setTransaksi(originalTransactions);
       setTabungan(originalSavings);
-      console.error("❌ Gagal menghapus transaksi:", error);
+      await updateData(originalSavings, originalTransactions);
+      console.error("❌ Gagal hapus, data dipulihkan");
       throw error;
     }
   };
