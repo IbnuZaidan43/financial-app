@@ -218,7 +218,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <Badge className={`${getSyncColor()} flex items-center gap-1`}>
             {getSyncIcon()}
             <span className="text-xs font-medium">
@@ -234,13 +234,13 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
             <span className="text-xs font-medium">Local</span>
           </Badge>
 
-          <div className="flex items-center gap-1 text-xs text-gray-600">
+          <div className="flex items-center gap-1 text-xs text-gray-600 ml-auto sm:ml-0">
             {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
             <span>{isOnline ? 'Online' : 'Offline'}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between w-full sm:w-auto gap-2">
           <span className="text-xs text-gray-500">
             Last sync: {formatLastSync(lastSync)}
           </span>
@@ -266,7 +266,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
       {!isOnline && (
         <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-start gap-2">
-            <WifiOff className="w-4 h-4 text-orange-600 mt-0.5" />
+            <WifiOff className="w-4 h-4 text-orange-600 mt-0.5 shrink-0" />
             <div>
               <h5 className="font-medium text-orange-800">Offline Mode</h5>
               <p className="text-sm text-orange-700">
@@ -278,13 +278,13 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <Filter className="h-5 w-5" />
             Filter Transaksi
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
           <div className="space-y-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -292,11 +292,11 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                 placeholder="Cari judul atau keterangan..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 w-full"
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="grid grid-cols-1 sm:flex sm:flex-row gap-3">
               <Select value={filterTabungan} onValueChange={setFilterTabungan}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Semua Tabungan" />
@@ -309,7 +309,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                       <SelectItem key={t.id} value={t.id!.toString()}>
                         <div className="flex items-center gap-2">
                           {getKategoriIcon(kategori)}
-                          <span>{t.nama}</span>
+                          <span className="truncate">{t.nama}</span>
                         </div>
                       </SelectItem>
                     );
@@ -347,18 +347,18 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
             <span className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
               Riwayat Transaksi
             </span>
-            <span className="text-sm font-normal text-gray-600">
+            <span className="text-xs font-normal text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
               {filteredTransaksi.length} transaksi
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
           {filteredTransaksi.length > 0 ? (
             <div className="space-y-3">
               {filteredTransaksi.map((t) => {
@@ -366,9 +366,9 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                 const kategori = getTabunganKategori(t.tabunganId);
                 
                 return (
-                  <div key={t.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-3">
+                    <div className="flex items-start sm:items-center gap-3 min-w-0 w-full sm:w-auto flex-1">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shrink-0 flex items-center justify-center ${
                         t.tipe === 'pemasukan' ? 'bg-green-100' : 'bg-red-100'
                       }`}>
                         {t.tipe === 'pemasukan' ? (
@@ -377,13 +377,13 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                           <ArrowDownRight className="h-5 w-5 text-red-600" />
                         )}
                       </div>
-                      <div>
-                        <h4 className="font-medium">{t.judul}</h4>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-semibold text-sm sm:text-base truncate pr-2" title={t.judul}>
                         {t.deskripsi && (
-                          <p className="text-sm text-gray-600 mb-1">{t.deskripsi}</p>
+                          <p className="text-sm text-gray-600 truncate">{t.deskripsi}</p>
                         )}
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-2 text-sm mt-1 text-gray-600">
+                          <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 max-w-[100px] sm:max-w-none">
                             <div className={`p-0.5 rounded ${getKategoriColor(kategori)}`}>
                               {getKategoriIcon(kategori)}
                             </div>
@@ -398,9 +398,9 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                       <div className="text-right">
-                        <p className={`font-bold ${
+                        <p className={`font-bold text-xs sm:text-sm ${
                           t.tipe === 'pemasukan' ? 'text-green-600' : 'text-red-600'
                         }`}>
                           {t.tipe === 'pemasukan' ? '+' : '-'}
@@ -419,7 +419,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDelete(t.id!)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0 shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
