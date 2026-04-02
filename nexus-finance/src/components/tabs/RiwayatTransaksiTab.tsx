@@ -218,7 +218,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Badge className={`${getSyncColor()} flex items-center gap-1`}>
             {getSyncIcon()}
             <span className="text-xs font-medium">
@@ -366,9 +366,9 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                 const kategori = getTabunganKategori(t.tabunganId);
                 
                 return (
-                  <div key={t.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  <div key={t.id} className="flex items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-3">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full shrink-0 flex items-center justify-center ${
                         t.tipe === 'pemasukan' ? 'bg-green-100' : 'bg-red-100'
                       }`}>
                         {t.tipe === 'pemasukan' ? (
@@ -377,13 +377,13 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                           <ArrowDownRight className="h-5 w-5 text-red-600" />
                         )}
                       </div>
-                      <div>
-                        <h4 className="font-medium">{t.judul}</h4>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-medium text-sm sm:text-base truncate">{t.judul}</h4>
                         {t.deskripsi && (
-                          <p className="text-sm text-gray-600 mb-1">{t.deskripsi}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 mb-1 truncate">{t.deskripsi}</p>
                         )}
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-gray-600">
+                          <span className="flex items-center gap-1 truncate max-w-[70px] sm:max-w-none">
                             <div className={`p-0.5 rounded ${getKategoriColor(kategori)}`}>
                               {getKategoriIcon(kategori)}
                             </div>
@@ -398,9 +398,9 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                       <div className="text-right">
-                        <p className={`font-bold ${
+                        <p className={`font-bold whitespace-nowrap tracking-tight text-xs sm:text-base ${
                           t.tipe === 'pemasukan' ? 'text-green-600' : 'text-red-600'
                         }`}>
                           {t.tipe === 'pemasukan' ? '+' : '-'}
@@ -419,7 +419,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDelete(t.id!)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 sm:h-8 sm:w-8 p-0 shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
