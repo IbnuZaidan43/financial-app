@@ -378,7 +378,7 @@ export default function RiwayatTransaksiTab({ transaksi, tabungan, onDataUpdate 
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-semibold text-sm sm:text-base truncate pr-2" title={t.judul}>
+                        <h4 className="font-medium text-sm sm:text-base truncate">{t.judul}</h4>
                         {t.deskripsi && (
                           <p className="text-sm text-gray-600 truncate">{t.deskripsi}</p>
                         )}
