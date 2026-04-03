@@ -75,6 +75,24 @@ const getUserId = () => {
   return id;
 };
 
+export const getKategoriFromNama = (nama: string) => {
+  const lowerNama = nama.toLowerCase();
+  if (lowerNama.includes('bca') || lowerNama.includes('mandiri') || lowerNama.includes('bni') || 
+      lowerNama.includes('bri') || lowerNama.includes('cimb') || lowerNama.includes('danamon') ||
+      lowerNama.includes('permata') || lowerNama.includes('bank')) {
+    return 'bank';
+  } else if (lowerNama.includes('gopay') || lowerNama.includes('ovo') || lowerNama.includes('dana') || 
+             lowerNama.includes('shopeepay') || lowerNama.includes('linkaja') || lowerNama.includes('sakuku')) {
+    return 'e-wallet';
+  } else if (lowerNama.includes('ktm') || lowerNama.includes('tapcash') || lowerNama.includes('flazz') || lowerNama.includes('brizzi') || 
+             lowerNama.includes('emoney') || lowerNama.includes('ezlink')) {
+    return 'e-money';
+  } else if (lowerNama.includes('cash') || lowerNama.includes('tunai') || lowerNama.includes('uang')) {
+    return 'cash';
+  }
+  return 'lainnya';
+};
+
 export function FinancialProvider({ children }: { children: ReactNode }) {
   const [tabungan, setTabungan] = useState<TabunganData[]>([]);
   const [transaksi, setTransaksi] = useState<TransaksiData[]>([]);
@@ -449,41 +467,177 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   }, [forceSync]);
 
   const exportData = async (type: 'transactions' | 'savings') => {
-  try {
-    let worksheet: XLSX.WorkSheet;
-    let fileName: string;
-
-    if (type === 'transactions') {
-      const dataForExcel = transaksi.map(t => ({
-        Tanggal: t.tanggal,
-        Judul: t.judul,
-        Keterangan: t.deskripsi || '',
-        Jumlah: t.jumlah,
-        Tipe: t.tipe,
-        Tabungan: tabungan.find(tab => tab.id === t.tabunganId)?.nama || 'Tidak diketahui'
-      }));
-      worksheet = XLSX.utils.json_to_sheet(dataForExcel);
-      fileName = `Laporan_Keuangan_${new Date().toISOString().split('T')[0]}.xlsx`;
-    } else {
-      const dataForExcel = tabungan.map(t => ({
-        Nama: t.nama,
-        Saldo: t.jumlah,
-        'Dibuat Tanggal': new Date(t.createdAt).toLocaleDateString('id-ID')
-      }));
-      worksheet = XLSX.utils.json_to_sheet(dataForExcel);
-      fileName = `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.xlsx`;
+    try {
+      const workbook = XLSX.utils.book_new();
+      let fileName: string;
+  
+      if (type === 'transactions') {
+        const categoriesOrder = ['bank', 'e-wallet', 'e-money', 'cash', 'lainnya'];
+        const groupedTransactions: Record<string, typeof transaksi> = {};
+  
+        transaksi.forEach(t => {
+          const monthYear = new Date(t.tanggal).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+          if (!groupedTransactions[monthYear]) groupedTransactions[monthYear] = [];
+          groupedTransactions[monthYear].push(t);
+        });
+  
+        if (Object.keys(groupedTransactions).length === 0) {
+          const emptySheet = XLSX.utils.json_to_sheet([{ Pesan: 'Tidak ada data transaksi' }]);
+          XLSX.utils.book_append_sheet(workbook, emptySheet, 'Data Kosong');
+        } else {
+          Object.entries(groupedTransactions).forEach(([monthYear, monthTransactions]) => {
+            // Urutkan dari yang terlama ke terbaru untuk saldo berjalan
+            const sortedTrx = [...monthTransactions].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+  
+            const activeTabungan = tabungan.filter(tab => 
+              sortedTrx.some(trx => trx.tabunganId === tab.id)
+            );
+  
+            const headerRow4 = ['No', 'Tanggal'];
+            const headerRow5 = ['', ''];
+            const merges: any[] = [];
+            const colMap: Record<string, { in: number; out: number; balance: number }> = {};
+            const catMap: Record<string, { in: number; out: number; balance: number; tabs: string[] }> = {};
+  
+            let currentCol = 2;
+  
+            categoriesOrder.forEach(cat => {
+              const tabsInCat = activeTabungan.filter(t => getKategoriFromNama(t.nama) === cat);
+              if (tabsInCat.length === 0) return;
+  
+              catMap[cat] = { in: 0, out: 0, balance: 0, tabs: tabsInCat.map(t => t.id) };
+  
+              tabsInCat.forEach(tab => {
+                headerRow4.push(tab.nama, '', `Saldo ${tab.nama}`);
+                headerRow5.push('IN', 'OUT', '');
+                
+                merges.push({ s: { r: 3, c: currentCol }, e: { r: 3, c: currentCol + 1 } });
+                merges.push({ s: { r: 3, c: currentCol + 2 }, e: { r: 4, c: currentCol + 2 } });
+                
+                colMap[tab.id] = { in: currentCol, out: currentCol + 1, balance: currentCol + 2 };
+                currentCol += 3;
+              });
+  
+              const catLabel = cat.toUpperCase();
+              headerRow4.push(`SUB ${catLabel}`, '', `SALDO ${catLabel}`);
+              headerRow5.push('IN', 'OUT', '');
+              
+              merges.push({ s: { r: 3, c: currentCol }, e: { r: 3, c: currentCol + 1 } }); 
+              merges.push({ s: { r: 3, c: currentCol + 2 }, e: { r: 4, c: currentCol + 2 } }); 
+              
+              catMap[cat].in = currentCol;
+              catMap[cat].out = currentCol + 1;
+              catMap[cat].balance = currentCol + 2;
+              currentCol += 3;
+            });
+  
+            const totalColIndex = currentCol;
+            const noteColIndex = currentCol + 1;
+            headerRow4.push('TOTAL SALDO', 'DESKRIPSI / CATATAN');
+            headerRow5.push('', '');
+            merges.push({ s: { r: 3, c: totalColIndex }, e: { r: 4, c: totalColIndex } });
+            merges.push({ s: { r: 3, c: noteColIndex }, e: { r: 4, c: noteColIndex } });
+  
+            const dataRows: any[] = [];
+            const runningBalances: Record<string, number> = {}; 
+            
+            // Set saldo awal (menggunakan saldo awal tabungan, atau 0)
+            activeTabungan.forEach(tab => { runningBalances[tab.id] = tab.saldoAwal || 0; });
+  
+            sortedTrx.forEach((trx, index) => {
+              const row = new Array(noteColIndex + 1).fill('-');
+              row[0] = index + 1;
+              row[1] = new Date(trx.tanggal).toLocaleDateString('id-ID');
+              row[noteColIndex] = trx.judul + (trx.deskripsi ? ` - ${trx.deskripsi}` : '');
+  
+              if (trx.tabunganId && colMap[trx.tabunganId]) {
+                const cols = colMap[trx.tabunganId];
+                const amount = trx.jumlah;
+                
+                if (trx.tipe === 'pemasukan') {
+                  row[cols.in] = amount;
+                  runningBalances[trx.tabunganId] += amount;
+                } else {
+                  row[cols.out] = amount;
+                  runningBalances[trx.tabunganId] -= amount;
+                }
+              }
+  
+              let grandTotal = 0;
+              Object.keys(catMap).forEach(cat => {
+                let catTotalIn = 0;
+                let catTotalOut = 0;
+                let catBalance = 0;
+  
+                catMap[cat].tabs.forEach(tabId => {
+                  const cols = colMap[tabId];
+                  const b = runningBalances[tabId] || 0;
+                  row[cols.balance] = b; 
+                  catBalance += b;
+                  
+                  if (trx.tabunganId === tabId) {
+                    if (trx.tipe === 'pemasukan') catTotalIn = trx.jumlah;
+                    else catTotalOut = trx.jumlah;
+                  }
+                });
+  
+                row[catMap[cat].in] = catTotalIn > 0 ? catTotalIn : '-';
+                row[catMap[cat].out] = catTotalOut > 0 ? catTotalOut : '-';
+                row[catMap[cat].balance] = catBalance;
+                grandTotal += catBalance;
+              });
+  
+              row[totalColIndex] = grandTotal;
+              dataRows.push(row);
+            });
+  
+            const wsData = [
+              [`Laporan Keuangan Bulan ${monthYear}`], 
+              [''],                                   
+              [''],                                   
+              headerRow4,                             
+              headerRow5,                             
+              ...dataRows                             
+            ];
+  
+            const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+  
+            // Setting lebar kolom agar rapi
+            const colWidths = [{ wch: 5 }, { wch: 15 }]; // No, Tanggal
+            for(let i = 2; i < noteColIndex; i++) colWidths.push({ wch: 15 });
+            colWidths.push({ wch: 30 }); // Notes
+            worksheet['!cols'] = colWidths;
+  
+            merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: noteColIndex } }); // Judul
+            merges.push({ s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }); // No
+            merges.push({ s: { r: 3, c: 1 }, e: { r: 4, c: 1 } }); // Tanggal
+            
+            worksheet['!merges'] = merges;
+            XLSX.utils.book_append_sheet(workbook, worksheet, monthYear);
+          });
+        }
+  
+        fileName = `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
+  
+      } else {
+        const dataForExcel = tabungan.map(t => ({
+          'Nama Dompet / Bank': t.nama,
+          'Total Saldo Saat Ini': new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(t.jumlah),
+          'Tanggal Dibuat': new Date(t.createdAt).toLocaleDateString('id-ID')
+        }));
+        
+        const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+        worksheet['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Tabungan');
+        fileName = `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.xlsx`;
+      }
+  
+      XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+      console.error(`❌ Failed to export ${type}:`, error);
+      throw error;
     }
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, type === 'transactions' ? 'Transaksi' : 'Tabungan');
-    XLSX.writeFile(workbook, fileName);
-
-    console.log(`✅ ${type} exported successfully`);
-  } catch (error) {
-    console.error(`❌ Failed to export ${type}:`, error);
-    throw error;
-  }
-};
+  };
 
 const importData = async (file: File) => {
   return new Promise((resolve, reject) => {
