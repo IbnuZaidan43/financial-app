@@ -71,10 +71,9 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini di mesin lokal Anda:
 
 3. **Konfigurasi Environment Variables**
     Buat file .env di root directory dan isi dengan kredensial berikut:
-    # Cuplikan kode
     # Koneksi Database Supabase
-    DATABASE_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"
-    DIRECT_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"
+      DATABASE_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"
+      DIRECT_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"
 
     # Next Auth
     NEXTAUTH_URL="http://localhost:3000"
@@ -90,7 +89,7 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini di mesin lokal Anda:
     npx prisma generate
     npx prisma db push
 
-5. ***Jalankan Development Server**
+5. **Jalankan Development Server**
     ```bash
     npm run dev
 
