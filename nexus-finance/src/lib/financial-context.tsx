@@ -486,27 +486,19 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
           XLSX.utils.book_append_sheet(workbook, emptySheet, 'Data Kosong');
         } else {
           Object.entries(groupedTransactions).forEach(([monthYear, monthTransactions]) => {
-            // Urutkan dari yang terlama ke terbaru untuk saldo berjalan
             const sortedTrx = [...monthTransactions].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
-  
-            const activeTabungan = tabungan.filter(tab => 
-              sortedTrx.some(trx => trx.tabunganId === tab.id)
-            );
-  
+            const activeTabungan = [...tabungan];
             const headerRow4 = ['No', 'Tanggal'];
             const headerRow5 = ['', ''];
             const merges: any[] = [];
             const colMap: Record<string, { in: number; out: number; balance: number }> = {};
-            const catMap: Record<string, { in: number; out: number; balance: number; tabs: string[] }> = {};
-  
+            const catMap: Record<string, { balance: number; tabs: string[] }> = {};
             let currentCol = 2;
   
             categoriesOrder.forEach(cat => {
               const tabsInCat = activeTabungan.filter(t => getKategoriFromNama(t.nama) === cat);
               if (tabsInCat.length === 0) return;
-  
-              catMap[cat] = { in: 0, out: 0, balance: 0, tabs: tabsInCat.map(t => t.id) };
-  
+              catMap[cat] = { balance: 0, tabs: tabsInCat.map(t => t.id) };
               tabsInCat.forEach(tab => {
                 headerRow4.push(tab.nama, '', `Saldo ${tab.nama}`);
                 headerRow5.push('IN', 'OUT', '');
@@ -519,16 +511,12 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               });
   
               const catLabel = cat.toUpperCase();
-              headerRow4.push(`SUB ${catLabel}`, '', `SALDO ${catLabel}`);
-              headerRow5.push('IN', 'OUT', '');
+              headerRow4.push(`TOTAL SALDO ${catLabel}`);
+              headerRow5.push('');
+              merges.push({ s: { r: 3, c: currentCol }, e: { r: 4, c: currentCol } }); 
               
-              merges.push({ s: { r: 3, c: currentCol }, e: { r: 3, c: currentCol + 1 } }); 
-              merges.push({ s: { r: 3, c: currentCol + 2 }, e: { r: 4, c: currentCol + 2 } }); 
-              
-              catMap[cat].in = currentCol;
-              catMap[cat].out = currentCol + 1;
-              catMap[cat].balance = currentCol + 2;
-              currentCol += 3;
+              catMap[cat].balance = currentCol;
+              currentCol += 1;
             });
   
             const totalColIndex = currentCol;
@@ -540,15 +528,29 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   
             const dataRows: any[] = [];
             const runningBalances: Record<string, number> = {}; 
-            
-            // Set saldo awal (menggunakan saldo awal tabungan, atau 0)
             activeTabungan.forEach(tab => { runningBalances[tab.id] = tab.saldoAwal || 0; });
+            let lastDate = '';
+            let startMergeRow = -1;
+            const DATA_START_ROW_INDEX = 5;
   
             sortedTrx.forEach((trx, index) => {
+              const currentRowIndex = DATA_START_ROW_INDEX + index;
+              const trxDate = new Date(trx.tanggal).toLocaleDateString('id-ID');
               const row = new Array(noteColIndex + 1).fill('-');
+              
               row[0] = index + 1;
-              row[1] = new Date(trx.tanggal).toLocaleDateString('id-ID');
               row[noteColIndex] = trx.judul + (trx.deskripsi ? ` - ${trx.deskripsi}` : '');
+  
+              if (trxDate !== lastDate) {
+                if (startMergeRow !== -1 && currentRowIndex - 1 > startMergeRow) {
+                  merges.push({ s: { r: startMergeRow, c: 1 }, e: { r: currentRowIndex - 1, c: 1 } });
+                }
+                lastDate = trxDate;
+                startMergeRow = currentRowIndex;
+                row[1] = trxDate;
+              } else {
+                row[1] = '';
+              }
   
               if (trx.tabunganId && colMap[trx.tabunganId]) {
                 const cols = colMap[trx.tabunganId];
@@ -565,8 +567,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   
               let grandTotal = 0;
               Object.keys(catMap).forEach(cat => {
-                let catTotalIn = 0;
-                let catTotalOut = 0;
                 let catBalance = 0;
   
                 catMap[cat].tabs.forEach(tabId => {
@@ -574,15 +574,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                   const b = runningBalances[tabId] || 0;
                   row[cols.balance] = b; 
                   catBalance += b;
-                  
-                  if (trx.tabunganId === tabId) {
-                    if (trx.tipe === 'pemasukan') catTotalIn = trx.jumlah;
-                    else catTotalOut = trx.jumlah;
-                  }
                 });
-  
-                row[catMap[cat].in] = catTotalIn > 0 ? catTotalIn : '-';
-                row[catMap[cat].out] = catTotalOut > 0 ? catTotalOut : '-';
                 row[catMap[cat].balance] = catBalance;
                 grandTotal += catBalance;
               });
@@ -591,6 +583,12 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               dataRows.push(row);
             });
   
+            const lastDataRowIndex = DATA_START_ROW_INDEX + sortedTrx.length - 1;
+            if (startMergeRow !== -1 && lastDataRowIndex > startMergeRow) {
+              merges.push({ s: { r: startMergeRow, c: 1 }, e: { r: lastDataRowIndex, c: 1 } });
+            }
+  
+            // --- ASSEMBLE SHEET ---
             const wsData = [
               [`Laporan Keuangan Bulan ${monthYear}`], 
               [''],                                   
@@ -601,16 +599,14 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             ];
   
             const worksheet = XLSX.utils.aoa_to_sheet(wsData);
-  
-            // Setting lebar kolom agar rapi
-            const colWidths = [{ wch: 5 }, { wch: 15 }]; // No, Tanggal
+            const colWidths = [{ wch: 5 }, { wch: 15 }];
             for(let i = 2; i < noteColIndex; i++) colWidths.push({ wch: 15 });
-            colWidths.push({ wch: 30 }); // Notes
+            colWidths.push({ wch: 30 });
             worksheet['!cols'] = colWidths;
   
-            merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: noteColIndex } }); // Judul
-            merges.push({ s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }); // No
-            merges.push({ s: { r: 3, c: 1 }, e: { r: 4, c: 1 } }); // Tanggal
+            merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: noteColIndex } });
+            merges.push({ s: { r: 3, c: 0 }, e: { r: 4, c: 0 } });
+            merges.push({ s: { r: 3, c: 1 }, e: { r: 4, c: 1 } });
             
             worksheet['!merges'] = merges;
             XLSX.utils.book_append_sheet(workbook, worksheet, monthYear);
