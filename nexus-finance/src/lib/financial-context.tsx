@@ -579,7 +579,11 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               const trxDate = new Date(trx.tanggal).toLocaleDateString('id-ID');
               const row = new Array(noteColIndex + 1).fill('-');
               row[0] = index + 1;
-              row[noteColIndex] = trx.judul + (trx.deskripsi ? ` - ${trx.deskripsi}` : '');
+              if (trx.deskripsi && trx.deskripsi.trim().toLowerCase() !== trx.judul.trim().toLowerCase()) {
+                row[noteColIndex] = `${trx.judul} - ${trx.deskripsi}`;
+              } else {
+                row[noteColIndex] = trx.judul;
+              }
   
               if (trxDate !== lastDate) {
                 if (startMergeRow !== -1 && currentRowIndex - 1 > startMergeRow) {
