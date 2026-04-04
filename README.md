@@ -72,12 +72,12 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini di mesin lokal Anda:
 3. **Konfigurasi Environment Variables**
     Buat file .env di root directory dan isi dengan kredensial berikut:
     # Koneksi Database Supabase
-      DATABASE_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"
-      DIRECT_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"
+      ```DATABASE_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"```
+      ```DIRECT_URL="postgresql://postgres.[PROYEK_ID]:[PASSWORD]@[aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres](https://aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres)"```
 
     # Next Auth
-    NEXTAUTH_URL="http://localhost:3000"
-    NEXTAUTH_SECRET="buat_random_string_rahasia_disini"
+    ```NEXTAUTH_URL="http://localhost:3000"```
+    ```NEXTAUTH_SECRET="buat_random_string_rahasia_disini"```
 
     # Google OAuth
     GOOGLE_CLIENT_ID="client_id_google_anda.apps.googleusercontent.com"
