@@ -618,9 +618,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               runningBalances[tab.id] = startBal; 
             });
 
+            const firstDayString = new Date(startOfMonth).toLocaleDateString('id-ID');
             const initialRow = new Array(noteColIndex).fill('-'); 
             initialRow[0] = 1; 
-            initialRow[1] = ''; 
+            initialRow[1] = firstDayString;
             initialRow[noteColIndex - 1] = 'SALDO PINDAHAN BULAN LALU';
 
             let initialGrandTotal = 0;
@@ -642,19 +643,19 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               if (colNum <= noteColIndex) {
                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
                 cell.alignment = { vertical: 'middle' };
-                cell.font = { bold: true, italic: true, name: 'Times New Roman' };
+                cell.font = { italic: true, name: 'Times New Roman' };
                 
-                if (colNum === noteColIndex) cell.alignment.horizontal = 'right';
+                if (colNum === noteColIndex) cell.alignment.horizontal = 'center';
                 if (colNum === 1) {
                   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
-                  cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+                  cell.font = { color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
                   cell.alignment.horizontal = 'center';
                 }
               }
             });
 
-            let lastDate = '';
-            let startMergeRow = -1;
+            let lastDate = firstDayString;
+            let startMergeRow = 6;
             let currentRowIndex = 7; 
   
             sortedTrx.forEach((trx, index) => {
@@ -713,7 +714,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                   cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
                   cell.alignment = { vertical: 'middle' };
                   
-                  if (colNum === 1 || colNum === 2) cell.alignment.horizontal = 'center';
+                  if (colNum === 1 || colNum === 2 || colNum === noteColIndex) cell.alignment.horizontal = 'center';
                   if (colNum === 1) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
                     cell.font = { color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
