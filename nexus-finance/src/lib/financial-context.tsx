@@ -508,11 +508,14 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   
             const activeTabungan = [...tabungan];
             const worksheet = workbook.addWorksheet(monthYear);
+            
             const headerRow4: string[] = ['No', 'Tanggal'];
             const headerRow5: string[] = ['', ''];
+            
             const colMap: Record<string, { in: number; out: number; balance: number }> = {};
             const catMap: Record<string, { balance: number; tabs: string[] }> = {}; 
-            const currencyColumns: number[] = [];
+            const currencyColumns: number[] = []; 
+            const mergesToApply: [number, number, number, number][] = [];
             let currentCol = 3; 
   
             categoriesOrder.forEach(cat => {
@@ -524,7 +527,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               tabsInCat.forEach(tab => {
                 headerRow4.push(tab.nama, '', '');
                 headerRow5.push('IN', 'OUT', 'Saldo');
-                worksheet.mergeCells(4, currentCol, 4, currentCol + 2);
+                mergesToApply.push([4, currentCol, 4, currentCol + 2]);
                 
                 colMap[tab.id] = { in: currentCol, out: currentCol + 1, balance: currentCol + 2 };
                 currencyColumns.push(currentCol, currentCol + 1, currentCol + 2);
@@ -534,7 +537,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               const catLabel = cat.toUpperCase();
               headerRow4.push(`TOTAL ${catLabel}`);
               headerRow5.push('');
-              worksheet.mergeCells(4, currentCol, 5, currentCol); 
+              mergesToApply.push([4, currentCol, 5, currentCol]); 
               catMap[cat].balance = currentCol;
               currencyColumns.push(currentCol);
               currentCol += 1; 
@@ -545,24 +548,28 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             
             headerRow4.push('TOTAL KESELURUHAN', 'DESKRIPSI / CATATAN');
             headerRow5.push('', '');
-            worksheet.mergeCells(4, totalColIndex, 5, totalColIndex);
-            worksheet.mergeCells(4, noteColIndex, 5, noteColIndex);
+          
+            mergesToApply.push([4, totalColIndex, 5, totalColIndex]);
+            mergesToApply.push([4, noteColIndex, 5, noteColIndex]);
             currencyColumns.push(totalColIndex);
-            worksheet.mergeCells(4, 1, 5, 1);
-            worksheet.mergeCells(4, 2, 5, 2);
+
             worksheet.getRow(4).values = headerRow4;
             worksheet.getRow(5).values = headerRow5;
 
+            mergesToApply.forEach(mergeArgs => worksheet.mergeCells(...mergeArgs));
+            worksheet.mergeCells(4, 1, 5, 1);
+            worksheet.mergeCells(4, 2, 5, 2);
+
             [4, 5].forEach(rowNum => {
               const row = worksheet.getRow(rowNum);
-              row.font = { bold: true, color: { argb: 'FF000000' }, name: 'Times New Roman' };
-              row.alignment = { horizontal: 'center', vertical: 'middle' };
               row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
                 if (colNumber <= noteColIndex) {
                   cell.border = {
                     top: { style: 'thin' }, left: { style: 'thin' },
                     bottom: { style: 'thin' }, right: { style: 'thin' }
                   };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                  cell.font = { bold: true, color: { argb: 'FF000000' }, name: 'Times New Roman' };
                 }
               });
             });
@@ -594,7 +601,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                 if (val4.startsWith('TOTAL ')) {
                   cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD966' } };
                 } else {
-                  // Nama tabungan
                   cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } };
                 }
               }
@@ -639,10 +645,9 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                 cell.font = { bold: true, italic: true, name: 'Times New Roman' };
                 
                 if (colNum === noteColIndex) cell.alignment.horizontal = 'right';
-                
                 if (colNum === 1) {
                   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
-                  cell.font = { bold: true, italic: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+                  cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
                   cell.alignment.horizontal = 'center';
                 }
               }
@@ -709,7 +714,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                   cell.alignment = { vertical: 'middle' };
                   
                   if (colNum === 1 || colNum === 2) cell.alignment.horizontal = 'center';
-                  
                   if (colNum === 1) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
                     cell.font = { color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
@@ -738,7 +742,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             worksheet.getColumn(1).width = 5;  
             worksheet.getColumn(2).width = 15; 
             for(let i = 3; i < noteColIndex; i++) {
-              worksheet.getColumn(i).width = 150 / 9; 
+              worksheet.getColumn(i).width = 150 / 9;
             }
             worksheet.getColumn(noteColIndex).width = 35;
             worksheet.eachRow({ includeEmpty: true }, (row) => {
@@ -756,7 +760,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         const buffer = await workbook.xlsx.writeBuffer();
         const fileName = `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
         saveAs(new Blob([buffer]), fileName);
-  
       } else {
         const worksheet = workbook.addWorksheet('Tabungan');
         
