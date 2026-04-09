@@ -489,6 +489,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
           emptySheet.getCell('A1').font = { name: 'Times New Roman' };
         } else {
           Object.entries(groupedTransactions).forEach(([monthYear, monthTransactions]) => {
+            
             const sortedTrx = [...monthTransactions].sort((a, b) => {
               const dateA = new Date(a.tanggal).getTime();
               const dateB = new Date(b.tanggal).getTime();
@@ -507,10 +508,8 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   
             const activeTabungan = [...tabungan];
             const worksheet = workbook.addWorksheet(monthYear);
-            
             const headerRow4: string[] = ['No', 'Tanggal'];
             const headerRow5: string[] = ['', ''];
-            
             const colMap: Record<string, { in: number; out: number; balance: number }> = {};
             const catMap: Record<string, { balance: number; tabs: string[] }> = {}; 
             const currencyColumns: number[] = [];
@@ -523,11 +522,9 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               catMap[cat] = { balance: 0, tabs: tabsInCat.map(t => t.id) };
   
               tabsInCat.forEach(tab => {
-                headerRow4.push(tab.nama, '', `Saldo ${tab.nama}`);
-                headerRow5.push('IN', 'OUT', '');
-                
-                worksheet.mergeCells(4, currentCol, 4, currentCol + 1);
-                worksheet.mergeCells(4, currentCol + 2, 5, currentCol + 2);
+                headerRow4.push(tab.nama, '', '');
+                headerRow5.push('IN', 'OUT', 'Saldo');
+                worksheet.mergeCells(4, currentCol, 4, currentCol + 2);
                 
                 colMap[tab.id] = { in: currentCol, out: currentCol + 1, balance: currentCol + 2 };
                 currencyColumns.push(currentCol, currentCol + 1, currentCol + 2);
@@ -537,7 +534,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               const catLabel = cat.toUpperCase();
               headerRow4.push(`TOTAL ${catLabel}`);
               headerRow5.push('');
-              
               worksheet.mergeCells(4, currentCol, 5, currentCol); 
               catMap[cat].balance = currentCol;
               currencyColumns.push(currentCol);
@@ -549,10 +545,11 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             
             headerRow4.push('TOTAL KESELURUHAN', 'DESKRIPSI / CATATAN');
             headerRow5.push('', '');
-            
             worksheet.mergeCells(4, totalColIndex, 5, totalColIndex);
             worksheet.mergeCells(4, noteColIndex, 5, noteColIndex);
             currencyColumns.push(totalColIndex);
+            worksheet.mergeCells(4, 1, 5, 1);
+            worksheet.mergeCells(4, 2, 5, 2);
             worksheet.getRow(4).values = headerRow4;
             worksheet.getRow(5).values = headerRow5;
 
@@ -570,8 +567,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               });
             });
 
-            worksheet.getCell(4, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
-            worksheet.getCell(4, 1).font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+            const cellNo = worksheet.getCell(4, 1);
+            cellNo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
+            cellNo.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+
             worksheet.getCell(4, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } };
             worksheet.getCell(4, totalColIndex).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF990099' } };
             worksheet.getCell(4, totalColIndex).font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
@@ -587,20 +586,22 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                 cell5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFA9D08E' } };
               } else if (val5 === 'OUT') {
                 cell5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFED7D31' } };
+              } else if (val5 === 'Saldo') {
+                cell5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
               }
 
               if (val4) {
-                if (val4.startsWith('Saldo ')) {
-                  cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-                } else if (val4.startsWith('TOTAL ')) {
+                if (val4.startsWith('TOTAL ')) {
                   cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD966' } };
                 } else {
+                  // Nama tabungan
                   cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } };
                 }
               }
             }
   
-            const runningBalances: Record<string, number> = {};
+            const runningBalances: Record<string, number> = {}; 
+            
             activeTabungan.forEach(tab => { 
               let startBal = tab.saldoAwal || 0;
               const pastTrx = transaksi.filter(t => t.tabunganId === tab.id && new Date(t.tanggal).getTime() < startOfMonth);
@@ -628,6 +629,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               initialGrandTotal += catBal;
             });
             initialRow[totalColIndex - 1] = initialGrandTotal;
+            
             const initialAddedRow = worksheet.addRow(initialRow);
             
             initialAddedRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
@@ -637,6 +639,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                 cell.font = { bold: true, italic: true, name: 'Times New Roman' };
                 
                 if (colNum === noteColIndex) cell.alignment.horizontal = 'right';
+                
                 if (colNum === 1) {
                   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
                   cell.font = { bold: true, italic: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
@@ -652,7 +655,9 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             sortedTrx.forEach((trx, index) => {
               const trxDate = new Date(trx.tanggal).toLocaleDateString('id-ID');
               const row = new Array(noteColIndex).fill('-'); 
-              row[0] = index + 2;
+              
+              row[0] = index + 2; 
+              
               let desc = trx.judul;
               if (trx.deskripsi && trx.deskripsi.trim().toLowerCase() !== trx.judul.trim().toLowerCase()) {
                 desc += ` - ${trx.deskripsi}`;
@@ -695,14 +700,16 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               });
   
               row[totalColIndex - 1] = grandTotal;
+              
               const newRow = worksheet.addRow(row);
               
               newRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
                 if (colNum <= noteColIndex) {
                   cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
                   cell.alignment = { vertical: 'middle' };
-
+                  
                   if (colNum === 1 || colNum === 2) cell.alignment.horizontal = 'center';
+                  
                   if (colNum === 1) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
                     cell.font = { color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
@@ -720,11 +727,12 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             worksheet.mergeCells(1, 1, 2, noteColIndex);
             const titleCell = worksheet.getCell('A1');
             titleCell.value = `LAPORAN KEUANGAN BULAN ${monthYear.toUpperCase()}`;
-            titleCell.font = { size:20, bold: true, name: 'Times New Roman' };
+            titleCell.font = { size: 16, bold: true, name: 'Times New Roman' };
             titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
+            const accountingFormat = '_("Rp"* #,##0_);_("Rp"* (#,##0);_("Rp"* "-"_);_(@_)';
             currencyColumns.forEach(colIndex => {
-              worksheet.getColumn(colIndex).numFmt = '"Rp"#,##0;[Red]-"Rp"#,##0';
+              worksheet.getColumn(colIndex).numFmt = accountingFormat;
             });
   
             worksheet.getColumn(1).width = 5;  
@@ -732,7 +740,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             for(let i = 3; i < noteColIndex; i++) {
               worksheet.getColumn(i).width = 150 / 9; 
             }
-            worksheet.getColumn(noteColIndex).width = 35; 
+            worksheet.getColumn(noteColIndex).width = 35;
             worksheet.eachRow({ includeEmpty: true }, (row) => {
               row.eachCell({ includeEmpty: true }, (cell, colNum) => {
                 const currentFont = cell.font || {};
@@ -748,6 +756,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         const buffer = await workbook.xlsx.writeBuffer();
         const fileName = `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
         saveAs(new Blob([buffer]), fileName);
+  
       } else {
         const worksheet = workbook.addWorksheet('Tabungan');
         
@@ -774,10 +783,11 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
           row.border = { top: { style:'thin' }, bottom: { style:'thin' }, left: { style:'thin' }, right: { style:'thin' }};
         });
 
-        worksheet.getColumn(2).numFmt = '"Rp"#,##0;[Red]-"Rp"#,##0';
+        worksheet.getColumn(2).numFmt = '_("Rp"* #,##0_);_("Rp"* (#,##0);_("Rp"* "-"_);_(@_)';
         worksheet.getColumn(1).width = 25;
         worksheet.getColumn(2).width = 25;
         worksheet.getColumn(3).width = 15;
+
         worksheet.eachRow({ includeEmpty: true }, (row) => {
           row.eachCell({ includeEmpty: true }, (cell) => {
             const currentFont = cell.font || {};
