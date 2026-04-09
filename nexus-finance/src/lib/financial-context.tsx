@@ -4,7 +4,8 @@ import { useSession } from 'next-auth/react';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { syncTransaksiToCloud, syncTabunganToCloud, getFinancialData, deleteTabunganFromCloud, deleteTransaksiFromCloud } from '@/app/actions';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 interface TabunganData {
   id: string;
@@ -53,7 +54,7 @@ interface FinancialContextType {
   syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   forceSync: () => Promise<void>;
   exportData: (type: 'transactions' | 'savings') => Promise<void>;
-  importData: (file: File) => Promise<any>;
+  // importData: (file: File) => Promise<any>;
   updateTabungan: (id: string, data: { nama: string; saldoAwal: number }) => Promise<void>;
   deleteTabungan: (id: string) => Promise<void>;
   deleteTransaksi: (id: string) => Promise<void>;
@@ -468,9 +469,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
   const exportData = async (type: 'transactions' | 'savings') => {
     try {
-      const workbook = XLSX.utils.book_new();
-      let fileName: string;
-  
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Nexus Financial';
+      workbook.created = new Date();
+
       if (type === 'transactions') {
         const categoriesOrder = ['bank', 'e-wallet', 'e-money', 'cash', 'lainnya'];
         const groupedTransactions: Record<string, typeof transaksi> = {};
@@ -482,11 +484,12 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         });
   
         if (Object.keys(groupedTransactions).length === 0) {
-          const emptySheet = XLSX.utils.json_to_sheet([{ Pesan: 'Tidak ada data transaksi' }]);
-          XLSX.utils.book_append_sheet(workbook, emptySheet, 'Data Kosong');
+          const emptySheet = workbook.addWorksheet('Data Kosong');
+          emptySheet.getCell('A1').value = 'Tidak ada data transaksi';
         } else {
           Object.entries(groupedTransactions).forEach(([monthYear, monthTransactions]) => {
             const sortedTrx = [...monthTransactions].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+            
             const firstTrxInMonth = sortedTrx[0];
             const startOfMonth = new Date(
               new Date(firstTrxInMonth.tanggal).getFullYear(),
@@ -495,12 +498,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             ).getTime();
   
             const activeTabungan = [...tabungan];
-            const headerRow4 = ['No', 'Tanggal'];
-            const headerRow5 = ['', ''];
-            const merges: any[] = [];
+            const worksheet = workbook.addWorksheet(monthYear);
+            const headerRow4: string[] = ['No', 'Tanggal'];
+            const headerRow5: string[] = ['', ''];
             const colMap: Record<string, { in: number; out: number; balance: number }> = {};
             const catMap: Record<string, { balance: number; tabs: string[] }> = {}; 
-            let currentCol = 2; 
+            const currencyColumns: number[] = [];
+            let currentCol = 3;
   
             categoriesOrder.forEach(cat => {
               const tabsInCat = activeTabungan.filter(t => getKategoriFromNama(t.nama) === cat);
@@ -511,100 +515,118 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               tabsInCat.forEach(tab => {
                 headerRow4.push(tab.nama, '', `Saldo ${tab.nama}`);
                 headerRow5.push('IN', 'OUT', '');
-                
-                merges.push({ s: { r: 3, c: currentCol }, e: { r: 3, c: currentCol + 1 } });
-                merges.push({ s: { r: 3, c: currentCol + 2 }, e: { r: 4, c: currentCol + 2 } });
+                worksheet.mergeCells(4, currentCol, 4, currentCol + 1);
+                worksheet.mergeCells(4, currentCol + 2, 5, currentCol + 2);
                 
                 colMap[tab.id] = { in: currentCol, out: currentCol + 1, balance: currentCol + 2 };
+                currencyColumns.push(currentCol, currentCol + 1, currentCol + 2);
                 currentCol += 3;
               });
   
               const catLabel = cat.toUpperCase();
-              headerRow4.push(`TOTAL SALDO ${catLabel}`);
+              headerRow4.push(`TOTAL ${catLabel}`);
               headerRow5.push('');
               
-              merges.push({ s: { r: 3, c: currentCol }, e: { r: 4, c: currentCol } }); 
-              
+              worksheet.mergeCells(4, currentCol, 5, currentCol); 
               catMap[cat].balance = currentCol;
+              currencyColumns.push(currentCol);
               currentCol += 1; 
             });
   
             const totalColIndex = currentCol;
             const noteColIndex = currentCol + 1;
-            headerRow4.push('TOTAL SALDO', 'DESKRIPSI / CATATAN');
+            
+            headerRow4.push('TOTAL KESELURUHAN', 'DESKRIPSI / CATATAN');
             headerRow5.push('', '');
-            merges.push({ s: { r: 3, c: totalColIndex }, e: { r: 4, c: totalColIndex } });
-            merges.push({ s: { r: 3, c: noteColIndex }, e: { r: 4, c: noteColIndex } });
+            
+            worksheet.mergeCells(4, totalColIndex, 5, totalColIndex);
+            worksheet.mergeCells(4, noteColIndex, 5, noteColIndex);
+            currencyColumns.push(totalColIndex);
+            worksheet.getRow(4).values = headerRow4;
+            worksheet.getRow(5).values = headerRow5;
+
+            [4, 5].forEach(rowNum => {
+              const row = worksheet.getRow(rowNum);
+              row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+              row.alignment = { horizontal: 'center', vertical: 'middle' };
+              row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                if (colNumber <= noteColIndex) {
+                  cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF1F2937' }
+                  };
+                  cell.border = {
+                    top: { style: 'thin' }, left: { style: 'thin' },
+                    bottom: { style: 'thin' }, right: { style: 'thin' }
+                  };
+                }
+              });
+            });
   
-            const dataRows: any[][] = [];
             const runningBalances: Record<string, number> = {}; 
             
             activeTabungan.forEach(tab => { 
               let startBal = tab.saldoAwal || 0;
               const pastTrx = transaksi.filter(t => t.tabunganId === tab.id && new Date(t.tanggal).getTime() < startOfMonth);
-              
               pastTrx.forEach(t => {
                 if (t.tipe === 'pemasukan') startBal += t.jumlah;
                 else startBal -= t.jumlah;
               });
-              
               runningBalances[tab.id] = startBal; 
             });
 
-            const initialRow = new Array(noteColIndex + 1).fill('-');
-            initialRow[0] = '';
-            initialRow[1] = '';
-            initialRow[noteColIndex] = 'SALDO AWAL BULAN';
+            const initialRow = new Array(noteColIndex).fill(null);
+            initialRow[noteColIndex - 1] = 'SALDO PINDAHAN BULAN LALU';
 
             let initialGrandTotal = 0;
             Object.keys(catMap).forEach(cat => {
               let catBal = 0;
               catMap[cat].tabs.forEach(tabId => {
                 const b = runningBalances[tabId] || 0;
-                initialRow[colMap[tabId].balance] = b;
+                initialRow[colMap[tabId].balance - 1] = b;
                 catBal += b;
               });
-              initialRow[catMap[cat].balance] = catBal;
+              initialRow[catMap[cat].balance - 1] = catBal;
               initialGrandTotal += catBal;
             });
-            initialRow[totalColIndex] = initialGrandTotal;
-            dataRows.push(initialRow);
-  
+            initialRow[totalColIndex - 1] = initialGrandTotal;
+            
+            const initialAddedRow = worksheet.addRow(initialRow);
+            initialAddedRow.font = { bold: true, italic: true };
+            initialAddedRow.getCell(noteColIndex).alignment = { horizontal: 'right' };
+            worksheet.mergeCells(6, 1, 6, 2);
+
             let lastDate = '';
             let startMergeRow = -1;
-            const DATA_START_ROW_INDEX = 6; 
-  
+            let currentRowIndex = 7;
             sortedTrx.forEach((trx, index) => {
-              const currentRowIndex = DATA_START_ROW_INDEX + index;
               const trxDate = new Date(trx.tanggal).toLocaleDateString('id-ID');
-              const row = new Array(noteColIndex + 1).fill('-');
+              const row = new Array(noteColIndex).fill(null);
               row[0] = index + 1;
+              let desc = trx.judul;
               if (trx.deskripsi && trx.deskripsi.trim().toLowerCase() !== trx.judul.trim().toLowerCase()) {
-                row[noteColIndex] = `${trx.judul} - ${trx.deskripsi}`;
-              } else {
-                row[noteColIndex] = trx.judul;
+                desc += ` - ${trx.deskripsi}`;
               }
+              row[noteColIndex - 1] = desc; 
   
               if (trxDate !== lastDate) {
                 if (startMergeRow !== -1 && currentRowIndex - 1 > startMergeRow) {
-                  merges.push({ s: { r: startMergeRow, c: 1 }, e: { r: currentRowIndex - 1, c: 1 } });
+                  worksheet.mergeCells(startMergeRow, 2, currentRowIndex - 1, 2);
                 }
                 lastDate = trxDate;
                 startMergeRow = currentRowIndex;
                 row[1] = trxDate; 
-              } else {
-                row[1] = ''; 
               }
   
               if (trx.tabunganId && colMap[trx.tabunganId]) {
                 const cols = colMap[trx.tabunganId];
                 const amount = trx.jumlah;
-                
                 if (trx.tipe === 'pemasukan') {
-                  row[cols.in] = amount;
+                  row[cols.in - 1] = amount;
                   runningBalances[trx.tabunganId] += amount;
                 } else {
-                  row[cols.out] = amount;
+                  row[cols.out - 1] = amount;
                   runningBalances[trx.tabunganId] -= amount;
                 }
               }
@@ -612,122 +634,152 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               let grandTotal = 0;
               Object.keys(catMap).forEach(cat => {
                 let catBalance = 0;
-  
                 catMap[cat].tabs.forEach(tabId => {
-                  const cols = colMap[tabId];
                   const b = runningBalances[tabId] || 0;
-                  row[cols.balance] = b; 
+                  row[colMap[tabId].balance - 1] = b; 
                   catBalance += b;
                 });
-  
-                row[catMap[cat].balance] = catBalance;
+                row[catMap[cat].balance - 1] = catBalance;
                 grandTotal += catBalance;
               });
   
-              row[totalColIndex] = grandTotal;
-              dataRows.push(row);
+              row[totalColIndex - 1] = grandTotal;
+              
+              const newRow = worksheet.addRow(row);
+              
+              newRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+                if (colNum <= noteColIndex) {
+                  cell.border = {
+                    top: { style: 'thin' }, left: { style: 'thin' },
+                    bottom: { style: 'thin' }, right: { style: 'thin' }
+                  };
+                  cell.alignment = { vertical: 'middle' };
+                  if (colNum === 1 || colNum === 2) cell.alignment.horizontal = 'center';
+                }
+              });
+
+              currentRowIndex++;
             });
   
-            const lastDataRowIndex = DATA_START_ROW_INDEX + sortedTrx.length - 1;
-            if (startMergeRow !== -1 && lastDataRowIndex > startMergeRow) {
-              merges.push({ s: { r: startMergeRow, c: 1 }, e: { r: lastDataRowIndex, c: 1 } });
+            if (startMergeRow !== -1 && currentRowIndex - 1 > startMergeRow) {
+              worksheet.mergeCells(startMergeRow, 2, currentRowIndex - 1, 2);
             }
+
+            worksheet.mergeCells(1, 1, 2, noteColIndex);
+            const titleCell = worksheet.getCell('A1');
+            titleCell.value = `LAPORAN KEUANGAN BULAN ${monthYear.toUpperCase()}`;
+            titleCell.font = { size: 16, bold: true };
+            titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            currencyColumns.forEach(colIndex => {
+              worksheet.getColumn(colIndex).numFmt = '"Rp"#,##0;[Red]-"Rp"#,##0';
+            });
   
-            const wsData = [
-              [`Laporan Keuangan Bulan ${monthYear}`], 
-              [''],                                   
-              [''],                                   
-              headerRow4,                             
-              headerRow5,                             
-              ...dataRows                             
-            ];
-            const worksheet = XLSX.utils.aoa_to_sheet(wsData);
-            const colWidths = [{ wch: 5 }, { wch: 15 }]; 
-            for(let i = 2; i < noteColIndex; i++) colWidths.push({ wch: 15 });
-            colWidths.push({ wch: 30 }); 
-            worksheet['!cols'] = colWidths;
-  
-            merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: noteColIndex } }); 
-            merges.push({ s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }); 
-            merges.push({ s: { r: 3, c: 1 }, e: { r: 4, c: 1 } }); 
-            
-            worksheet['!merges'] = merges;
-            XLSX.utils.book_append_sheet(workbook, worksheet, monthYear);
+            worksheet.getColumn(1).width = 5;
+            worksheet.getColumn(2).width = 15;
+            for(let i = 3; i < noteColIndex; i++) {
+              worksheet.getColumn(i).width = 16;
+            }
+            worksheet.getColumn(noteColIndex).width = 35;
           });
         }
   
-        fileName = `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const buffer = await workbook.xlsx.writeBuffer();
+        const fileName = `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
+        saveAs(new Blob([buffer]), fileName);
   
       } else {
-        const dataForExcel = tabungan.map(t => ({
-          'Nama Dompet / Bank': t.nama,
-          'Total Saldo Saat Ini': new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(t.jumlah),
-          'Tanggal Dibuat': new Date(t.createdAt).toLocaleDateString('id-ID')
-        }));
+        const worksheet = workbook.addWorksheet('Tabungan');
         
-        const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
-        worksheet['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 15 }];
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Tabungan');
-        fileName = `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.xlsx`;
+        worksheet.mergeCells('A1:C2');
+        const titleCell = worksheet.getCell('A1');
+        titleCell.value = 'DAFTAR TABUNGAN & SALDO';
+        titleCell.font = { size: 16, bold: true };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const headers = ['Nama Dompet / Bank', 'Total Saldo Saat Ini', 'Tanggal Dibuat'];
+        worksheet.getRow(4).values = headers;
+        
+        const headerRow = worksheet.getRow(4);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+        headerRow.alignment = { horizontal: 'center' };
+
+        tabungan.forEach(t => {
+          const row = worksheet.addRow([
+            t.nama,
+            t.jumlah,
+            new Date(t.createdAt).toLocaleDateString('id-ID')
+          ]);
+          row.border = { top: { style:'thin' }, bottom: { style:'thin' }, left: { style:'thin' }, right: { style:'thin' }};
+        });
+
+        worksheet.getColumn(2).numFmt = '"Rp"#,##0;[Red]-"Rp"#,##0';
+        worksheet.getColumn(1).width = 25;
+        worksheet.getColumn(2).width = 25;
+        worksheet.getColumn(3).width = 15;
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const fileName = `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.xlsx`;
+        saveAs(new Blob([buffer]), fileName);
       }
   
-      XLSX.writeFile(workbook, fileName);
     } catch (error) {
       console.error(`❌ Failed to export ${type}:`, error);
       throw error;
     }
   };
 
-const importData = async (file: File) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+// const importData = async (file: File) => {
+//   return new Promise((resolve, reject) => {
+//     const reader = new FileReader();
+//     reader.onload = async (e) => {
+//       try {
+//         const data = e.target?.result;
+//         const workbook = XLSX.read(data, { type: 'binary' });
+//         const sheetName = workbook.SheetNames[0];
+//         const worksheet = workbook.Sheets[sheetName];
+//         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        const importedTransactions: TransaksiData[] = [];
-        for (const row of jsonData as any[]) {
-          if (row.Tanggal && row.Jumlah && row.Tipe) {
-            const newTransaction: TransaksiData = {
-              id: crypto.randomUUID(),
-              judul: row.Judul || 'Transaksi Import',
-              jumlah: parseFloat(row.Jumlah),
-              deskripsi: row.Keterangan || null,
-              tanggal: new Date(row.Tanggal).toISOString().split('T')[0],
-              tipe: row.Tipe,
-              tabunganId: tabungan.find(t => t.nama === row.Tabungan)?.id || null,
-              kategoriId: null,
-              createdAt: new Date(),
-              updatedAt: new Date()
-            };
-            importedTransactions.push(newTransaction);
-          }
-        }
+//         const importedTransactions: TransaksiData[] = [];
+//         for (const row of jsonData as any[]) {
+//           if (row.Tanggal && row.Jumlah && row.Tipe) {
+//             const newTransaction: TransaksiData = {
+//               id: crypto.randomUUID(),
+//               judul: row.Judul || 'Transaksi Import',
+//               jumlah: parseFloat(row.Jumlah),
+//               deskripsi: row.Keterangan || null,
+//               tanggal: new Date(row.Tanggal).toISOString().split('T')[0],
+//               tipe: row.Tipe,
+//               tabunganId: tabungan.find(t => t.nama === row.Tabungan)?.id || null,
+//               kategoriId: null,
+//               createdAt: new Date(),
+//               updatedAt: new Date()
+//             };
+//             importedTransactions.push(newTransaction);
+//           }
+//         }
         
-        const updatedTransaksi = [...importedTransactions, ...transaksi];
-        setTransaksi(updatedTransaksi);
-        await updateData(tabungan, updatedTransaksi);
+//         const updatedTransaksi = [...importedTransactions, ...transaksi];
+//         setTransaksi(updatedTransaksi);
+//         await updateData(tabungan, updatedTransaksi);
 
-        importedTransactions.forEach(item => {
-          syncToCloud('transaksi', item);
-        });
+//         importedTransactions.forEach(item => {
+//           syncToCloud('transaksi', item);
+//         });
 
-        setLastSync(new Date());
-        console.log(`✅ ${importedTransactions.length} transactions imported successfully`);
-        resolve(importedTransactions);
-      } catch (error) {
-        console.error('❌ Failed to import data:', error);
-        reject(error);
-      }
-    };
-    reader.onerror = () => reject(new Error('Gagal membaca file'));
-    reader.readAsBinaryString(file);
-  });
-};
+//         setLastSync(new Date());
+//         console.log(`✅ ${importedTransactions.length} transactions imported successfully`);
+//         resolve(importedTransactions);
+//       } catch (error) {
+//         console.error('❌ Failed to import data:', error);
+//         reject(error);
+//       }
+//     };
+//     reader.onerror = () => reject(new Error('Gagal membaca file'));
+//     reader.readAsBinaryString(file);
+//   });
+// };
 
   return (
     <FinancialContext.Provider value={{
@@ -745,7 +797,7 @@ const importData = async (file: File) => {
       lastSync,
       forceSync,
       exportData,
-      importData,
+      // importData,
       updateTabungan,
       deleteTabungan,
       deleteTransaksi
