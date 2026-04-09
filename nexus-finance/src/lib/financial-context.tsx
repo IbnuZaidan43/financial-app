@@ -486,9 +486,17 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         if (Object.keys(groupedTransactions).length === 0) {
           const emptySheet = workbook.addWorksheet('Data Kosong');
           emptySheet.getCell('A1').value = 'Tidak ada data transaksi';
+          emptySheet.getCell('A1').font = { name: 'Times New Roman' };
         } else {
           Object.entries(groupedTransactions).forEach(([monthYear, monthTransactions]) => {
-            const sortedTrx = [...monthTransactions].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+            const sortedTrx = [...monthTransactions].sort((a, b) => {
+              const dateA = new Date(a.tanggal).getTime();
+              const dateB = new Date(b.tanggal).getTime();
+              if (dateA === dateB) {
+                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+              }
+              return dateA - dateB;
+            });
             
             const firstTrxInMonth = sortedTrx[0];
             const startOfMonth = new Date(
@@ -499,12 +507,14 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   
             const activeTabungan = [...tabungan];
             const worksheet = workbook.addWorksheet(monthYear);
+            
             const headerRow4: string[] = ['No', 'Tanggal'];
             const headerRow5: string[] = ['', ''];
+            
             const colMap: Record<string, { in: number; out: number; balance: number }> = {};
             const catMap: Record<string, { balance: number; tabs: string[] }> = {}; 
             const currencyColumns: number[] = [];
-            let currentCol = 3;
+            let currentCol = 3; 
   
             categoriesOrder.forEach(cat => {
               const tabsInCat = activeTabungan.filter(t => getKategoriFromNama(t.nama) === cat);
@@ -515,6 +525,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               tabsInCat.forEach(tab => {
                 headerRow4.push(tab.nama, '', `Saldo ${tab.nama}`);
                 headerRow5.push('IN', 'OUT', '');
+                
                 worksheet.mergeCells(4, currentCol, 4, currentCol + 1);
                 worksheet.mergeCells(4, currentCol + 2, 5, currentCol + 2);
                 
@@ -547,15 +558,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
             [4, 5].forEach(rowNum => {
               const row = worksheet.getRow(rowNum);
-              row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+              row.font = { bold: true, color: { argb: 'FF000000' }, name: 'Times New Roman' };
               row.alignment = { horizontal: 'center', vertical: 'middle' };
               row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
                 if (colNumber <= noteColIndex) {
-                  cell.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FF1F2937' }
-                  };
                   cell.border = {
                     top: { style: 'thin' }, left: { style: 'thin' },
                     bottom: { style: 'thin' }, right: { style: 'thin' }
@@ -563,9 +569,38 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                 }
               });
             });
+
+            worksheet.getCell(4, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
+            worksheet.getCell(4, 1).font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+            worksheet.getCell(4, 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BC2E6' } };
+            worksheet.getCell(4, totalColIndex).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF990099' } };
+            worksheet.getCell(4, totalColIndex).font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+            worksheet.getCell(4, noteColIndex).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } };
+
+            for (let c = 3; c < totalColIndex; c++) {
+              const cell4 = worksheet.getCell(4, c);
+              const cell5 = worksheet.getCell(5, c);
+              const val4 = cell4.value ? cell4.value.toString() : '';
+              const val5 = cell5.value ? cell5.value.toString() : '';
+
+              if (val5 === 'IN') {
+                cell5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFA9D08E' } };
+              } else if (val5 === 'OUT') {
+                cell5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFED7D31' } };
+              }
+
+              if (val4) {
+                if (val4.startsWith('Saldo ')) {
+                  cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+                } else if (val4.startsWith('TOTAL ')) {
+                  cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD966' } };
+                } else {
+                  cell4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } };
+                }
+              }
+            }
   
-            const runningBalances: Record<string, number> = {}; 
-            
+            const runningBalances: Record<string, number> = {};
             activeTabungan.forEach(tab => { 
               let startBal = tab.saldoAwal || 0;
               const pastTrx = transaksi.filter(t => t.tabunganId === tab.id && new Date(t.tanggal).getTime() < startOfMonth);
@@ -576,7 +611,9 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               runningBalances[tab.id] = startBal; 
             });
 
-            const initialRow = new Array(noteColIndex).fill(null);
+            const initialRow = new Array(noteColIndex).fill('-'); 
+            initialRow[0] = 1; 
+            initialRow[1] = ''; 
             initialRow[noteColIndex - 1] = 'SALDO PINDAHAN BULAN LALU';
 
             let initialGrandTotal = 0;
@@ -584,26 +621,38 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               let catBal = 0;
               catMap[cat].tabs.forEach(tabId => {
                 const b = runningBalances[tabId] || 0;
-                initialRow[colMap[tabId].balance - 1] = b;
+                initialRow[colMap[tabId].balance - 1] = b; 
                 catBal += b;
               });
               initialRow[catMap[cat].balance - 1] = catBal;
               initialGrandTotal += catBal;
             });
             initialRow[totalColIndex - 1] = initialGrandTotal;
-            
             const initialAddedRow = worksheet.addRow(initialRow);
-            initialAddedRow.font = { bold: true, italic: true };
-            initialAddedRow.getCell(noteColIndex).alignment = { horizontal: 'right' };
-            worksheet.mergeCells(6, 1, 6, 2);
+            
+            initialAddedRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+              if (colNum <= noteColIndex) {
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                cell.alignment = { vertical: 'middle' };
+                cell.font = { bold: true, italic: true, name: 'Times New Roman' };
+                
+                if (colNum === noteColIndex) cell.alignment.horizontal = 'right';
+                if (colNum === 1) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
+                  cell.font = { bold: true, italic: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+                  cell.alignment.horizontal = 'center';
+                }
+              }
+            });
 
             let lastDate = '';
             let startMergeRow = -1;
-            let currentRowIndex = 7;
+            let currentRowIndex = 7; 
+  
             sortedTrx.forEach((trx, index) => {
               const trxDate = new Date(trx.tanggal).toLocaleDateString('id-ID');
-              const row = new Array(noteColIndex).fill(null);
-              row[0] = index + 1;
+              const row = new Array(noteColIndex).fill('-'); 
+              row[0] = index + 2;
               let desc = trx.judul;
               if (trx.deskripsi && trx.deskripsi.trim().toLowerCase() !== trx.judul.trim().toLowerCase()) {
                 desc += ` - ${trx.deskripsi}`;
@@ -617,6 +666,8 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
                 lastDate = trxDate;
                 startMergeRow = currentRowIndex;
                 row[1] = trxDate; 
+              } else {
+                row[1] = ''; 
               }
   
               if (trx.tabunganId && colMap[trx.tabunganId]) {
@@ -644,17 +695,18 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
               });
   
               row[totalColIndex - 1] = grandTotal;
-              
               const newRow = worksheet.addRow(row);
               
               newRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
                 if (colNum <= noteColIndex) {
-                  cell.border = {
-                    top: { style: 'thin' }, left: { style: 'thin' },
-                    bottom: { style: 'thin' }, right: { style: 'thin' }
-                  };
+                  cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
                   cell.alignment = { vertical: 'middle' };
+
                   if (colNum === 1 || colNum === 2) cell.alignment.horizontal = 'center';
+                  if (colNum === 1) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
+                    cell.font = { color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
+                  }
                 }
               });
 
@@ -668,47 +720,55 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             worksheet.mergeCells(1, 1, 2, noteColIndex);
             const titleCell = worksheet.getCell('A1');
             titleCell.value = `LAPORAN KEUANGAN BULAN ${monthYear.toUpperCase()}`;
-            titleCell.font = { size: 16, bold: true };
+            titleCell.font = { size:20, bold: true, name: 'Times New Roman' };
             titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
             currencyColumns.forEach(colIndex => {
               worksheet.getColumn(colIndex).numFmt = '"Rp"#,##0;[Red]-"Rp"#,##0';
             });
   
-            worksheet.getColumn(1).width = 5;
-            worksheet.getColumn(2).width = 15;
+            worksheet.getColumn(1).width = 5;  
+            worksheet.getColumn(2).width = 15; 
             for(let i = 3; i < noteColIndex; i++) {
-              worksheet.getColumn(i).width = 16;
+              worksheet.getColumn(i).width = 150 / 9; 
             }
-            worksheet.getColumn(noteColIndex).width = 35;
+            worksheet.getColumn(noteColIndex).width = 35; 
+            worksheet.eachRow({ includeEmpty: true }, (row) => {
+              row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+                const currentFont = cell.font || {};
+                if (colNum !== 1) {
+                  cell.font = { ...currentFont, name: 'Times New Roman' };
+                }
+              });
+            });
+
           });
         }
   
         const buffer = await workbook.xlsx.writeBuffer();
         const fileName = `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
         saveAs(new Blob([buffer]), fileName);
-  
       } else {
         const worksheet = workbook.addWorksheet('Tabungan');
         
         worksheet.mergeCells('A1:C2');
         const titleCell = worksheet.getCell('A1');
         titleCell.value = 'DAFTAR TABUNGAN & SALDO';
-        titleCell.font = { size: 16, bold: true };
+        titleCell.font = { size: 16, bold: true, name: 'Times New Roman' };
         titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
         const headers = ['Nama Dompet / Bank', 'Total Saldo Saat Ini', 'Tanggal Dibuat'];
         worksheet.getRow(4).values = headers;
         
         const headerRow = worksheet.getRow(4);
-        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Times New Roman' };
         headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
         headerRow.alignment = { horizontal: 'center' };
 
         tabungan.forEach(t => {
           const row = worksheet.addRow([
             t.nama,
-            t.jumlah,
+            t.jumlah, 
             new Date(t.createdAt).toLocaleDateString('id-ID')
           ]);
           row.border = { top: { style:'thin' }, bottom: { style:'thin' }, left: { style:'thin' }, right: { style:'thin' }};
@@ -718,6 +778,12 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         worksheet.getColumn(1).width = 25;
         worksheet.getColumn(2).width = 25;
         worksheet.getColumn(3).width = 15;
+        worksheet.eachRow({ includeEmpty: true }, (row) => {
+          row.eachCell({ includeEmpty: true }, (cell) => {
+            const currentFont = cell.font || {};
+            cell.font = { ...currentFont, name: 'Times New Roman' };
+          });
+        });
 
         const buffer = await workbook.xlsx.writeBuffer();
         const fileName = `Laporan_Tabungan_${new Date().toISOString().split('T')[0]}.xlsx`;
