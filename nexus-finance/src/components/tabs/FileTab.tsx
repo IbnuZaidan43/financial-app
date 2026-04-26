@@ -19,7 +19,7 @@ export default function FileTab() {
     tabungan,
     transaksi, 
     exportData,
-    importData
+    // importData
   } = useFinancial();
 
   const handleExport = async (type: 'transactions' | 'savings') => {
@@ -34,7 +34,7 @@ export default function FileTab() {
 
   const handleImport = async (file: File) => {
     try {
-      await importData(file);
+      // await importData(file);
       toast.success('Data berhasil di-import!');
       setShowImportDialog(false);
     } catch (error) {

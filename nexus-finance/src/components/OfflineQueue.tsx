@@ -379,7 +379,7 @@ export function OfflineQueueDashboard({ className }: OfflineQueueDashboardProps)
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() =>
+                              // onClick={() =>
                             >
                               <XCircle className="w-4 h-4" />
                             </Button>
